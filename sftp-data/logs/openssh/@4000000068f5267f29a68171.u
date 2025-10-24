@@ -1,0 +1,8 @@
+2025-10-19 08:45:18.582909419  Server listening on 0.0.0.0 port 2222.
+2025-10-19 08:45:18.584378745  Server listening on :: port 2222.
+2025-10-19 08:45:19.580394128  Connection to localhost (::1) 2222 port [tcp/*] succeeded!
+2025-10-19 08:45:19.589575909  Connection closed by ::1 port 50372
+2025-10-19 14:17:09.908023031  Accepted password for test from 172.18.0.1 port 34036 ssh2
+2025-10-19 14:28:46.827955877  Connection closed by 172.18.0.1 port 34036
+2025-10-19 14:29:04.226262924  Accepted password for test from 172.18.0.1 port 44156 ssh2
+2025-10-19 14:29:33.527742953  Connection closed by 172.18.0.1 port 44156
