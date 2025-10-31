@@ -2,6 +2,21 @@
 name = "ev3-runner"
 version = "0.1.0"
 edition = "2024"
+license = "MIT"
+description = "Tool to upload and run binaries on a LEGO ev3"
+repository = "https://github.com/kingananas20/ev3-runner"
+readme = "README.md"
+keywords = ["cli", "ev3dev", "ssh", "tcp"]
+categories = ["command-line-utilities"]
+
+include = [
+    "src/**",
+    "README.md",
+    "Cargo.toml",
+    "Cargo.lock",
+    "LICENSE",
+]
+
 default-run = "ev3-runner"
 
 [dependencies]
