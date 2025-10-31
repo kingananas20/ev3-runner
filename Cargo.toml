@@ -19,6 +19,10 @@ include = [
 
 default-run = "ev3-runner"
 
+[[bin]]
+name = "ev3-runner"
+path = "src/main.rs"
+
 [dependencies]
 anyhow = "1.0.100"
 axum = { version = "0.8.6", features = ["macros"] }
