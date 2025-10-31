@@ -13,7 +13,6 @@ EV3 Runner is a Rust-based application designed to interact with EV3 robots over
 ## Prerequisites
 
 - Rust (edition 2024)
-- Docker and Docker Compose (for the OpenSSH server)
 - EV3 robot with SSH enabled
 
 ## Installation
