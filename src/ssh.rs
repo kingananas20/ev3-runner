@@ -1,15 +1,13 @@
-use ssh2::{Channel, DisconnectCode, KeyboardInteractivePrompt, Session, Sftp};
+use ssh2::{Channel, DisconnectCode, KeyboardInteractivePrompt, Session};
 use std::convert::Infallible;
 use std::fs::File;
-use std::hash::Hasher;
-use std::io;
-use std::io::{BufReader, BufWriter, Read, Write};
+use std::io::BufReader;
+use std::io::{self};
 use std::net::TcpStream as StdTcpStream;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::str::FromStr;
 use std::time::Instant;
 use tracing::{info, warn};
-use twox_hash::XxHash64;
 
 struct AuthMethods {
     password: bool,
@@ -60,6 +58,7 @@ impl SshSession {
         let tcp_stream = StdTcpStream::connect(host)?;
         let mut session = Session::new()?;
         session.set_tcp_stream(tcp_stream);
+        session.set_compress(true);
         session.handshake()?;
 
         let auth_methods = session
@@ -86,13 +85,11 @@ impl SshSession {
     #[tracing::instrument(skip(self))]
     pub fn upload_and_exec(
         &mut self,
-        src_path: &str,
-        dst_path: &str,
+        src_path: &Path,
+        dst_path: &Path,
     ) -> Result<BufReader<Channel>, SessionError> {
-        self.session.set_compress(true);
-        if !self.same_checksum(src_path, dst_path)? {
-            self.upload(src_path, dst_path)?;
-        }
+        info!("uploading and executing...");
+        self.upload(src_path, dst_path)?;
 
         let reader = self.exec(dst_path)?;
 
@@ -100,91 +97,31 @@ impl SshSession {
     }
 
     #[tracing::instrument(skip(self))]
-    fn same_checksum(&mut self, src_path: &str, dst_path: &str) -> Result<bool, SessionError> {
-        let sftp = self.get_sftp()?;
-        let Ok(remote_file) = sftp.open(dst_path) else {
-            info!("File does not exist. Checksum false");
-            return Ok(false);
-        };
-        let mut reader = BufReader::new(remote_file);
-        let mut server_hasher = XxHash64::with_seed(0);
-        let mut buf = [0u8; 256 * 1024];
-
-        loop {
-            let n = reader.read(&mut buf)?;
-            if n == 0 {
-                break;
-            }
-            server_hasher.write(&buf[..n]);
-        }
-        let server_checksum = server_hasher.finish();
-
-        let file = File::open(src_path)?;
-        let mut reader = BufReader::new(file);
-        let mut client_hasher = XxHash64::with_seed(0);
-        let mut buf = [0u8; 256 * 1024];
-
-        loop {
-            let n = reader.read(&mut buf)?;
-            if n == 0 {
-                break;
-            }
-            client_hasher.write(&buf[..n]);
-        }
-        let client_checksum = client_hasher.finish();
-
-        let result = server_checksum == client_checksum;
-
-        info!("Same checksums? {result}");
-        Ok(result)
-    }
-
-    #[tracing::instrument(skip(self))]
-    fn upload(&mut self, src_path: &str, dst_path: &str) -> Result<(), SessionError> {
+    fn upload(&mut self, src_path: &Path, dst_path: &Path) -> Result<(), SessionError> {
         let instant = Instant::now();
 
-        let local_file = File::open(src_path)?;
-        let mut reader = BufReader::new(local_file);
+        let mut local_file = File::open(src_path)?;
+        let meta = local_file.metadata()?;
 
-        let sftp = self.get_sftp()?;
-        let dst_path = Path::new(dst_path);
-        if let Some(parent) = dst_path.parent() {
-            let mut current = PathBuf::new();
-            for component in parent.components() {
-                current = current.join(component);
-                sftp.mkdir(&current, 0o755).ok();
-            }
-        }
+        let mut remote_file = self.session.scp_send(dst_path, 0o755, meta.len(), None)?;
 
-        let remote_file = sftp.create(dst_path)?;
-        let mut writer = BufWriter::new(remote_file);
+        std::io::copy(&mut local_file, &mut remote_file)?;
 
-        let mut buffer = [0u8; 256 * 1024];
-        loop {
-            let n = reader.read(&mut buffer)?;
-            if n == 0 {
-                break;
-            }
-            writer.write_all(&buffer[..n])?;
-        }
-
-        writer.flush()?;
-
-        let mut stat = sftp.stat(dst_path)?;
-        stat.perm = Some(0o755);
-        sftp.setstat(dst_path, stat)?;
-
-        info!("File uploaded in {:?}", instant.elapsed());
+        info!(
+            "{} bytes file uploaded in {:?}",
+            meta.len(),
+            instant.elapsed()
+        );
 
         Ok(())
     }
 
     #[tracing::instrument(skip(self))]
-    fn exec(&mut self, filepath: &str) -> Result<BufReader<Channel>, SessionError> {
-        info!("Executing {filepath}");
+    fn exec(&mut self, filepath: &Path) -> Result<BufReader<Channel>, SessionError> {
+        info!("Executing {}", filepath.display());
         let mut channel = self.get_channel()?;
 
-        channel.exec(&format!("./{filepath}"))?;
+        channel.exec(&format!("./{}", filepath.display()))?;
         let reader = BufReader::new(channel);
 
         Ok(reader)
@@ -192,10 +129,6 @@ impl SshSession {
 
     fn get_channel(&mut self) -> Result<Channel, SessionError> {
         Ok(self.session.channel_session()?)
-    }
-
-    fn get_sftp(&mut self) -> Result<Sftp, SessionError> {
-        Ok(self.session.sftp()?)
     }
 
     #[tracing::instrument(skip(self))]

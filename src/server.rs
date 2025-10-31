@@ -11,6 +11,7 @@ use futures::{
 use serde::Deserialize;
 use std::{
     io::{self, BufRead},
+    path::PathBuf,
     sync::Arc,
     thread,
 };
@@ -23,8 +24,8 @@ use tracing::{error, warn};
 
 #[derive(Debug, Deserialize)]
 pub struct Run {
-    src_path: String,
-    dst_path: String,
+    src_path: PathBuf,
+    dst_path: PathBuf,
 }
 
 #[derive(Debug, thiserror::Error)]
