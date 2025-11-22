@@ -12,7 +12,7 @@ use std::{
     net::{TcpListener, TcpStream},
     path::Path,
 };
-use tracing::{debug, error, info};
+use tracing::{debug, error, info, trace, warn};
 
 #[derive(Debug, thiserror::Error)]
 enum ServerError {
@@ -40,14 +40,15 @@ pub fn server(config: Server) -> io::Result<()> {
 fn handle_client(mut socket: TcpStream) -> Result<(), ServerError> {
     let mut len_buf = [0u8; 4];
     if let Err(e) = socket.read_exact(&mut len_buf) {
-        error!("Failed to read header length");
+        warn!("Failed to read header length");
         return Err(e.into());
     }
     let header_len = u32::from_be_bytes(len_buf) as usize;
+    trace!("header_len: {header_len}");
 
     let mut header_buf = vec![0u8; header_len];
     if let Err(e) = socket.read_exact(&mut header_buf) {
-        error!("Failed to read header");
+        warn!("Failed to read header");
         return Err(e.into());
     }
 
@@ -55,15 +56,17 @@ fn handle_client(mut socket: TcpStream) -> Result<(), ServerError> {
     {
         Ok((h, _)) => h,
         Err(e) => {
-            error!("Failed to deserialize header: {e}");
+            warn!("Failed to deserialize header: {e}");
             return Err(e.into());
         }
     };
+    trace!("header: {header:?}");
 
     let hash_match = check_hash(&header.path, header.hash)?;
-    info!("Hashmatch {:?}", hash_match);
+    info!("Does the hash match? {:?}", hash_match);
     let res = bincode::encode_to_vec(hash_match, standard())?;
     let res_len = (res.len() as u32).to_be_bytes();
+    trace!("res_len: {res_len:?}");
     socket.write_all(&res_len)?;
     socket.write_all(&res)?;
 
@@ -74,6 +77,7 @@ fn handle_client(mut socket: TcpStream) -> Result<(), ServerError> {
     Ok(())
 }
 
+#[tracing::instrument]
 fn check_hash(file_path: &Path, client_hash: u64) -> Result<HashMatch, Error> {
     if !file_path.exists() || !file_path.is_file() {
         return Ok(HashMatch::NoMatch);
@@ -84,6 +88,7 @@ fn check_hash(file_path: &Path, client_hash: u64) -> Result<HashMatch, Error> {
 
     let hash = calculate_hash(&mut reader)?;
 
+    debug!("hash: {hash} / client_hash: {client_hash}");
     if hash == client_hash {
         return Ok(HashMatch::Match);
     }
@@ -103,7 +108,7 @@ fn upload(socket: &mut TcpStream, path: &Path, size: u64) -> io::Result<()> {
     {
         Ok(f) => f,
         Err(e) => {
-            error!("Failed to open file: {e}");
+            warn!("Failed to open file: {e}");
             return Err(e);
         }
     };
@@ -111,6 +116,7 @@ fn upload(socket: &mut TcpStream, path: &Path, size: u64) -> io::Result<()> {
     // only works on linux
     if cfg!(target_os = "linux") {
         file.set_permissions(Permissions::from_mode(0o755))?;
+        trace!("Set file permissions on linux");
     }
 
     let mut remaining = size;
@@ -118,16 +124,17 @@ fn upload(socket: &mut TcpStream, path: &Path, size: u64) -> io::Result<()> {
     while remaining > 0 {
         let to_read = std::cmp::min(remaining, buf.len() as u64) as usize;
         if let Err(e) = socket.read_exact(&mut buf[..to_read]) {
-            error!("Failed to read to buffer: {e}");
+            warn!("Failed to read to buffer: {e}");
             return Err(e);
         };
 
         if let Err(e) = file.write_all(&buf[..to_read]) {
-            error!("Failed to write to file");
+            warn!("Failed to write to file");
             return Err(e);
         }
 
         remaining -= to_read as u64;
+        trace!("remaining: {remaining} / to_read: {to_read}");
     }
 
     info!("File received successfully");
