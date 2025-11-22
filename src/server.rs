@@ -2,12 +2,9 @@ use crate::cli::Server;
 use bincode::Decode;
 use std::{
     fs::OpenOptions,
-    io::{self, Write},
-    path::{Path, PathBuf},
-};
-use tokio::{
-    io::AsyncReadExt,
+    io::{self, Read, Write},
     net::{TcpListener, TcpStream},
+    path::{Path, PathBuf},
 };
 use tracing::{debug, error, info};
 
@@ -17,31 +14,29 @@ enum Request {
     Execute { _path: PathBuf },
 }
 
-pub async fn server(config: Server) -> io::Result<()> {
-    let listener = TcpListener::bind(format!("0.0.0.0:{}", config.server_port)).await?;
+pub fn server(config: Server) -> io::Result<()> {
+    let listener = TcpListener::bind(format!("0.0.0.0:{}", config.server_port))?;
     info!("Server listening on port {}", config.server_port);
 
     loop {
-        let (socket, addr) = listener.accept().await?;
+        let (socket, addr) = listener.accept()?;
         info!("Accepted connection from {addr}");
 
-        tokio::spawn(async move {
-            handle_client(socket).await.ok();
-        });
+        handle_client(socket).ok();
     }
 }
 
 #[tracing::instrument]
-async fn handle_client(mut socket: TcpStream) -> io::Result<()> {
+fn handle_client(mut socket: TcpStream) -> io::Result<()> {
     let mut len_buf = [0u8; 4];
-    if let Err(e) = socket.read_exact(&mut len_buf).await {
+    if let Err(e) = socket.read_exact(&mut len_buf) {
         error!("Failed to read header length");
         return Err(e);
     }
     let header_len = u32::from_be_bytes(len_buf) as usize;
 
     let mut header_buf = vec![0u8; header_len];
-    if let Err(e) = socket.read_exact(&mut header_buf).await {
+    if let Err(e) = socket.read_exact(&mut header_buf) {
         error!("Failed to read header");
         return Err(e);
     }
@@ -56,7 +51,7 @@ async fn handle_client(mut socket: TcpStream) -> io::Result<()> {
     };
 
     match header {
-        Request::Upload { path, size } => upload(&mut socket, &path, size).await?,
+        Request::Upload { path, size } => upload(&mut socket, &path, size)?,
         Request::Execute { .. } => return Ok(()),
     }
 
@@ -64,7 +59,7 @@ async fn handle_client(mut socket: TcpStream) -> io::Result<()> {
 }
 
 #[tracing::instrument]
-async fn upload(socket: &mut TcpStream, path: &Path, size: u64) -> io::Result<()> {
+fn upload(socket: &mut TcpStream, path: &Path, size: u64) -> io::Result<()> {
     debug!("Receiving file");
 
     let mut file = match OpenOptions::new()
@@ -84,7 +79,7 @@ async fn upload(socket: &mut TcpStream, path: &Path, size: u64) -> io::Result<()
     let mut buf = [0u8; 8 * 1024];
     while remaining > 0 {
         let to_read = std::cmp::min(remaining, buf.len() as u64) as usize;
-        if let Err(e) = socket.read_exact(&mut buf[..to_read]).await {
+        if let Err(e) = socket.read_exact(&mut buf[..to_read]) {
             error!("Failed to read to buffer: {e}");
             return Err(e);
         };

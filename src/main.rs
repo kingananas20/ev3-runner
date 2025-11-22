@@ -1,4 +1,5 @@
 mod cli;
+mod client;
 mod server;
 
 use clap::Parser;
@@ -7,13 +8,12 @@ use server::server;
 use tracing_subscriber::FmtSubscriber;
 use tracing_subscriber::util::SubscriberInitExt;
 
-#[tokio::main]
-async fn main() -> anyhow::Result<()> {
+fn main() -> anyhow::Result<()> {
     setup_logging();
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Server(config) => server(config).await?,
+        Commands::Server(config) => server(config)?,
         Commands::Client(config) => println!("{config:?}"),
     }
 
