@@ -1,18 +1,12 @@
 use crate::cli::Server;
-use bincode::Decode;
+use crate::protocol::{Action, Request};
 use std::{
     fs::OpenOptions,
     io::{self, Read, Write},
     net::{TcpListener, TcpStream},
-    path::{Path, PathBuf},
+    path::Path,
 };
 use tracing::{debug, error, info};
-
-#[derive(Debug, Decode)]
-enum Request {
-    Upload { path: PathBuf, size: u64 }, // add hash
-    Execute { _path: PathBuf },
-}
 
 pub fn server(config: Server) -> io::Result<()> {
     let listener = TcpListener::bind(format!("0.0.0.0:{}", config.server_port))?;
@@ -50,9 +44,9 @@ fn handle_client(mut socket: TcpStream) -> io::Result<()> {
         }
     };
 
-    match header {
-        Request::Upload { path, size } => upload(&mut socket, &path, size)?,
-        Request::Execute { .. } => return Ok(()),
+    match header.action {
+        Action::Upload => upload(&mut socket, &header.path, header.size)?,
+        Action::Run => upload(&mut socket, &header.path, header.size)?,
     }
 
     Ok(())

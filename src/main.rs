@@ -1,5 +1,7 @@
 mod cli;
 mod client;
+mod hash;
+mod protocol;
 mod server;
 
 use clap::Parser;
@@ -8,13 +10,15 @@ use server::server;
 use tracing_subscriber::FmtSubscriber;
 use tracing_subscriber::util::SubscriberInitExt;
 
+use crate::client::client;
+
 fn main() -> anyhow::Result<()> {
     setup_logging();
     let cli = Cli::parse();
 
     match cli.command {
         Commands::Server(config) => server(config)?,
-        Commands::Client(config) => println!("{config:?}"),
+        Commands::Client(config) => client(config)?,
     }
 
     Ok(())
