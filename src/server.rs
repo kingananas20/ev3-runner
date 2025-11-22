@@ -1,108 +1,103 @@
-use crate::ssh::{SessionError, SshSession};
-use axum::{
-    Json,
-    extract::State,
-    response::{Sse, sse::Event},
-};
-use futures::{
-    StreamExt,
-    stream::{self, BoxStream},
-};
-use serde::Deserialize;
+use crate::cli::Server;
+use bincode::Decode;
 use std::{
-    io::{self, BufRead},
-    path::PathBuf,
-    sync::Arc,
-    thread,
+    fs::OpenOptions,
+    io::{self, Write},
+    path::{Path, PathBuf},
 };
 use tokio::{
-    sync::{Mutex, mpsc::unbounded_channel},
-    task::JoinError,
+    io::AsyncReadExt,
+    net::{TcpListener, TcpStream},
 };
-use tokio_stream::wrappers::UnboundedReceiverStream;
-use tracing::{error, warn};
+use tracing::{debug, error, info};
 
-#[derive(Debug, Deserialize)]
-pub struct Run {
-    src_path: PathBuf,
-    dst_path: PathBuf,
+#[derive(Debug, Decode)]
+enum Request {
+    Upload { path: PathBuf, size: u64 }, // add hash
+    Execute { _path: PathBuf },
 }
 
-#[derive(Debug, thiserror::Error)]
-pub enum ServerError {
-    #[error("axum error: {0}")]
-    Axum(#[from] axum::Error),
-    #[error("ssh error: {0}")]
-    SshSession(#[from] SessionError),
-    #[error("io error: {0}")]
-    Io(#[from] io::Error),
-    #[error("blocking task joinerror: {0}")]
-    Join(#[from] JoinError),
-}
+pub async fn server(config: Server) -> io::Result<()> {
+    let listener = TcpListener::bind(format!("0.0.0.0:{}", config.server_port)).await?;
+    info!("Server listening on port {}", config.server_port);
 
-impl axum::response::IntoResponse for ServerError {
-    fn into_response(self) -> axum::response::Response {
-        let status = axum::http::StatusCode::INTERNAL_SERVER_ERROR;
-        let body = format!("{self}");
-        (status, body).into_response()
+    loop {
+        let (socket, addr) = listener.accept().await?;
+        info!("Accepted connection from {addr}");
+
+        tokio::spawn(async move {
+            handle_client(socket).await.ok();
+        });
     }
 }
 
-pub struct SharedData {
-    pub sshsession: Mutex<SshSession>,
-}
+#[tracing::instrument]
+async fn handle_client(mut socket: TcpStream) -> io::Result<()> {
+    let mut len_buf = [0u8; 4];
+    if let Err(e) = socket.read_exact(&mut len_buf).await {
+        error!("Failed to read header length");
+        return Err(e);
+    }
+    let header_len = u32::from_be_bytes(len_buf) as usize;
 
-#[axum::debug_handler]
-pub async fn run(
-    State(state): State<Arc<SharedData>>,
-    Json(payload): Json<Run>,
-) -> Sse<BoxStream<'static, Result<Event, ServerError>>> {
-    let mut session = state.sshsession.lock().await;
-    let mut reader = match session.upload_and_exec(&payload.src_path, &payload.dst_path) {
-        Ok(r) => r,
+    let mut header_buf = vec![0u8; header_len];
+    if let Err(e) = socket.read_exact(&mut header_buf).await {
+        error!("Failed to read header");
+        return Err(e);
+    }
+
+    let header: Request = match bincode::decode_from_slice(&header_buf, bincode::config::standard())
+    {
+        Ok((h, _)) => h,
         Err(e) => {
-            warn!("{e}");
-            return Sse::new(stream::once(async { Err::<Event, ServerError>(e.into()) }).boxed());
+            error!("Failed to deserialize header: {e}");
+            return Ok(());
         }
     };
 
-    let (tx, rx) = unbounded_channel::<Result<String, ServerError>>();
+    match header {
+        Request::Upload { path, size } => upload(&mut socket, &path, size).await?,
+        Request::Execute { .. } => return Ok(()),
+    }
 
-    thread::spawn(move || {
-        let mut line = String::new();
+    Ok(())
+}
 
-        loop {
-            line.clear();
-            match reader.read_line(&mut line) {
-                Ok(0) => break,
-                Ok(_) => {
-                    let text = line.trim_end().to_owned();
-                    if tx.send(Ok(text)).is_err() {
-                        break;
-                    }
-                }
-                Err(e) => {
-                    warn!("{e}");
-                    tx.send(Err(e.into())).ok();
-                    break;
-                }
-            }
+#[tracing::instrument]
+async fn upload(socket: &mut TcpStream, path: &Path, size: u64) -> io::Result<()> {
+    debug!("Receiving file");
+
+    let mut file = match OpenOptions::new()
+        .create(true)
+        .write(true)
+        .truncate(true)
+        .open(path)
+    {
+        Ok(f) => f,
+        Err(e) => {
+            error!("Failed to open file: {e}");
+            return Err(e);
+        }
+    };
+
+    let mut remaining = size;
+    let mut buf = [0u8; 8 * 1024];
+    while remaining > 0 {
+        let to_read = std::cmp::min(remaining, buf.len() as u64) as usize;
+        if let Err(e) = socket.read_exact(&mut buf[..to_read]).await {
+            error!("Failed to read to buffer: {e}");
+            return Err(e);
+        };
+
+        if let Err(e) = file.write_all(&buf[..to_read]) {
+            error!("Failed to write to file");
+            return Err(e);
         }
 
-        let mut channel = reader.into_inner();
-        channel.wait_eof().ok();
-        channel.wait_close().ok();
-    });
+        remaining -= to_read as u64;
+    }
 
-    let stream = UnboundedReceiverStream::new(rx)
-        .map(|res| match res {
-            Ok(s) => Ok(Event::default().data(s)),
-            Err(e) => {
-                error!("{e}");
-                Err(e)
-            }
-        })
-        .boxed();
+    info!("File received successfully");
 
-    Sse::new(stream)
+    Ok(())
 }
