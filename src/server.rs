@@ -3,8 +3,9 @@ use crate::hash::calculate_hash;
 use crate::protocol::{HashMatch, Request};
 use bincode::config::standard;
 use bincode::error::{DecodeError, EncodeError};
-use std::fs::File;
+use std::fs::{File, Permissions};
 use std::io::{BufReader, Error};
+use std::os::unix::fs::PermissionsExt;
 use std::{
     fs::OpenOptions,
     io::{self, Read, Write},
@@ -106,6 +107,11 @@ fn upload(socket: &mut TcpStream, path: &Path, size: u64) -> io::Result<()> {
             return Err(e);
         }
     };
+
+    // only works on linux
+    if cfg!(target_os = "linux") {
+        file.set_permissions(Permissions::from_mode(0o755))?;
+    }
 
     let mut remaining = size;
     let mut buf = [0u8; 8 * 1024];
