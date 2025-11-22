@@ -2,6 +2,8 @@ use std::path::PathBuf;
 
 #[derive(Debug, clap::Parser)]
 pub struct Cli {
+    #[clap(short, long, global = true, action = clap::ArgAction::Count)]
+    pub verbose: u8,
     #[command(subcommand)]
     pub command: Commands,
 }
