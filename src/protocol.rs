@@ -14,3 +14,9 @@ pub enum Action {
     Upload,
     Run,
 }
+
+#[derive(Debug, Decode, Encode, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+pub enum HashMatch {
+    Match,
+    NoMatch,
+}

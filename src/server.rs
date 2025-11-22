@@ -1,5 +1,10 @@
 use crate::cli::Server;
-use crate::protocol::{Action, Request};
+use crate::hash::calculate_hash;
+use crate::protocol::{HashMatch, Request};
+use bincode::config::standard;
+use bincode::error::{DecodeError, EncodeError};
+use std::fs::File;
+use std::io::{BufReader, Error};
 use std::{
     fs::OpenOptions,
     io::{self, Read, Write},
@@ -7,6 +12,16 @@ use std::{
     path::Path,
 };
 use tracing::{debug, error, info};
+
+#[derive(Debug, thiserror::Error)]
+enum ServerError {
+    #[error("Encode error: {0}")]
+    Encode(#[from] EncodeError),
+    #[error("Decode error: {0}")]
+    Decode(#[from] DecodeError),
+    #[error("Io error: {0}")]
+    Io(#[from] Error),
+}
 
 pub fn server(config: Server) -> io::Result<()> {
     let listener = TcpListener::bind(format!("0.0.0.0:{}", config.server_port))?;
@@ -21,18 +36,18 @@ pub fn server(config: Server) -> io::Result<()> {
 }
 
 #[tracing::instrument]
-fn handle_client(mut socket: TcpStream) -> io::Result<()> {
+fn handle_client(mut socket: TcpStream) -> Result<(), ServerError> {
     let mut len_buf = [0u8; 4];
     if let Err(e) = socket.read_exact(&mut len_buf) {
         error!("Failed to read header length");
-        return Err(e);
+        return Err(e.into());
     }
     let header_len = u32::from_be_bytes(len_buf) as usize;
 
     let mut header_buf = vec![0u8; header_len];
     if let Err(e) = socket.read_exact(&mut header_buf) {
         error!("Failed to read header");
-        return Err(e);
+        return Err(e.into());
     }
 
     let header: Request = match bincode::decode_from_slice(&header_buf, bincode::config::standard())
@@ -40,16 +55,39 @@ fn handle_client(mut socket: TcpStream) -> io::Result<()> {
         Ok((h, _)) => h,
         Err(e) => {
             error!("Failed to deserialize header: {e}");
-            return Ok(());
+            return Err(e.into());
         }
     };
 
-    match header.action {
-        Action::Upload => upload(&mut socket, &header.path, header.size)?,
-        Action::Run => upload(&mut socket, &header.path, header.size)?,
+    let hash_match = check_hash(&header.path, header.hash)?;
+    info!("Hashmatch {:?}", hash_match);
+    let res = bincode::encode_to_vec(hash_match, standard())?;
+    let res_len = (res.len() as u32).to_be_bytes();
+    socket.write_all(&res_len)?;
+    socket.write_all(&res)?;
+
+    if hash_match == HashMatch::NoMatch {
+        upload(&mut socket, &header.path, header.size)?;
     }
 
     Ok(())
+}
+
+fn check_hash(file_path: &Path, client_hash: u64) -> Result<HashMatch, Error> {
+    if !file_path.exists() || !file_path.is_file() {
+        return Ok(HashMatch::NoMatch);
+    }
+
+    let file = File::open(file_path)?;
+    let mut reader = BufReader::new(file);
+
+    let hash = calculate_hash(&mut reader)?;
+
+    if hash == client_hash {
+        return Ok(HashMatch::Match);
+    }
+
+    Ok(HashMatch::NoMatch)
 }
 
 #[tracing::instrument]

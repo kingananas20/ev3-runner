@@ -1,9 +1,12 @@
 use crate::{
     cli::{Action, Client},
     hash::calculate_hash,
-    protocol::{self, Request},
+    protocol::{self, HashMatch, Request},
 };
-use bincode::{config::standard, error::EncodeError};
+use bincode::{
+    config::standard,
+    error::{DecodeError, EncodeError},
+};
 use std::{
     fs::File,
     io::{self, BufReader, Read, Seek, Write},
@@ -18,8 +21,10 @@ pub enum ClientError {
     PathNotValid(PathBuf),
     #[error("Io error: {0}")]
     Io(#[from] io::Error),
-    #[error("Error while encoding: {0}")]
+    #[error("Encode error: {0}")]
     Encode(#[from] EncodeError),
+    #[error("Decode error: {0}")]
+    Decode(#[from] DecodeError),
 }
 
 pub fn client(config: Client) -> Result<(), ClientError> {
@@ -59,9 +64,13 @@ pub fn client(config: Client) -> Result<(), ClientError> {
     stream.write_all(&req_len_bytes)?;
     stream.write_all(&request)?;
 
-    // Wait for send_file request
+    let mut res_len = [0u8; 4];
+    stream.read_exact(&mut res_len)?;
+    let mut buf = vec![0u8; u32::from_be_bytes(res_len) as usize];
+    stream.read_exact(&mut buf)?;
+    let (hash_match, _): (HashMatch, _) = bincode::decode_from_slice(&buf, standard())?;
 
-    {
+    if hash_match == HashMatch::NoMatch {
         let mut remaining = file_size;
         let mut buf = [0u8; 8 * 1024];
         while remaining > 0 {
