@@ -86,5 +86,19 @@ pub fn client(config: Client) -> Result<(), ClientError> {
         return Ok(());
     }
 
+    let mut stdout = io::stdout();
+    let mut buf = [0u8; 8 * 1024];
+
+    loop {
+        let n = stream.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        stdout.write_all(&buf[..n])?;
+        stdout.flush()?;
+    }
+
+    info!("Successfully run the file");
+
     Ok(())
 }

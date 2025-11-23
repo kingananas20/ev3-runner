@@ -1,11 +1,12 @@
 use crate::cli::Server;
 use crate::hash::calculate_hash;
-use crate::protocol::{HashMatch, Request};
+use crate::protocol::{Action, HashMatch, Request};
 use bincode::config::standard;
 use bincode::error::{DecodeError, EncodeError};
 use std::fs::{File, Permissions};
 use std::io::{BufReader, Error};
 use std::os::unix::fs::PermissionsExt;
+use std::process::Command;
 use std::{
     fs::OpenOptions,
     io::{self, Read, Write},
@@ -32,7 +33,9 @@ pub fn server(config: Server) -> io::Result<()> {
         let (socket, addr) = listener.accept()?;
         info!("Accepted connection from {addr}");
 
-        handle_client(socket).ok();
+        if let Err(e) = handle_client(socket) {
+            warn!("Error while handling connection: {e}");
+        }
     }
 }
 
@@ -73,6 +76,12 @@ fn handle_client(mut socket: TcpStream) -> Result<(), ServerError> {
     if hash_match == HashMatch::NoMatch {
         upload(&mut socket, &header.path, header.size)?;
     }
+
+    if header.action == Action::Upload {
+        return Ok(());
+    }
+
+    run(&mut socket, &header.path)?;
 
     Ok(())
 }
@@ -138,6 +147,45 @@ fn upload(socket: &mut TcpStream, path: &Path, size: u64) -> io::Result<()> {
     }
 
     info!("File received successfully");
+
+    Ok(())
+}
+
+#[tracing::instrument]
+fn run(socket: &mut TcpStream, path: &Path) -> Result<(), Error> {
+    debug!("Running the file");
+    let (mut reader, writer) = std::io::pipe()?;
+    let mut child = match Command::new(path)
+        .arg("-h")
+        .stdout(writer.try_clone()?)
+        .stderr(writer)
+        .spawn()
+    {
+        Ok(c) => c,
+        Err(e) => {
+            warn!("Failed to spawn child: {e}");
+            return Err(e);
+        }
+    };
+
+    let mut buf = [0u8; 8 * 1024];
+    loop {
+        let n = reader.read(&mut buf)?;
+        if n == 0 {
+            break;
+        }
+        socket.write_all(&buf[..n])?;
+    }
+    socket.shutdown(std::net::Shutdown::Write)?;
+
+    let status = child.wait()?;
+    if status.success() {
+        info!("child exited with exitstatus: {status}");
+    } else {
+        warn!("child exited with exitstatus: {status}");
+    }
+
+    info!("Ran the file");
 
     Ok(())
 }
