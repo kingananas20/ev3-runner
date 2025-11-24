@@ -1,3 +1,4 @@
+use crate::BUFFER_SIZE;
 use std::{
     fs::File,
     hash::Hasher as _,
@@ -9,7 +10,7 @@ pub fn calculate_hash(file: &mut BufReader<File>) -> Result<u64, Error> {
     let seed = 4167;
     let mut hasher = XxHash64::with_seed(seed);
 
-    let mut buf = [0u8; 8 * 1024];
+    let mut buf = [0u8; BUFFER_SIZE];
 
     loop {
         let n = file.read(&mut buf)?;

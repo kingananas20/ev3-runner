@@ -1,3 +1,4 @@
+use crate::BUFFER_SIZE;
 use crate::cli::Server;
 use crate::hash::calculate_hash;
 use crate::protocol::{Action, HashMatch, Request};
@@ -122,14 +123,8 @@ fn upload(socket: &mut TcpStream, path: &Path, size: u64) -> io::Result<()> {
         }
     };
 
-    // only works on linux
-    if cfg!(target_os = "linux") {
-        file.set_permissions(Permissions::from_mode(0o755))?;
-        trace!("Set file permissions on linux");
-    }
-
     let mut remaining = size;
-    let mut buf = [0u8; 8 * 1024];
+    let mut buf = [0u8; BUFFER_SIZE];
     while remaining > 0 {
         let to_read = std::cmp::min(remaining, buf.len() as u64) as usize;
         if let Err(e) = socket.read_exact(&mut buf[..to_read]) {
@@ -144,6 +139,12 @@ fn upload(socket: &mut TcpStream, path: &Path, size: u64) -> io::Result<()> {
 
         remaining -= to_read as u64;
         trace!("remaining: {remaining} / to_read: {to_read}");
+    }
+
+    // only works on linux
+    if cfg!(target_os = "linux") {
+        file.set_permissions(Permissions::from_mode(0o755))?;
+        trace!("Set file permissions on linux");
     }
 
     info!("File received successfully");
@@ -168,7 +169,7 @@ fn run(socket: &mut TcpStream, path: &Path) -> Result<(), Error> {
         }
     };
 
-    let mut buf = [0u8; 8 * 1024];
+    let mut buf = [0u8; BUFFER_SIZE];
     loop {
         let n = reader.read(&mut buf)?;
         if n == 0 {

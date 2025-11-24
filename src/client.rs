@@ -1,4 +1,5 @@
 use crate::{
+    BUFFER_SIZE,
     cli::{Action, Client},
     hash::calculate_hash,
     protocol::{self, HashMatch, Request},
@@ -72,7 +73,7 @@ pub fn client(config: Client) -> Result<(), ClientError> {
 
     if hash_match == HashMatch::NoMatch {
         let mut remaining = file_size;
-        let mut buf = [0u8; 8 * 1024];
+        let mut buf = [0u8; BUFFER_SIZE];
         while remaining > 0 {
             let to_read = std::cmp::min(remaining, buf.len() as u64) as usize;
             reader.read_exact(&mut buf[..to_read])?;
@@ -87,7 +88,7 @@ pub fn client(config: Client) -> Result<(), ClientError> {
     }
 
     let mut stdout = io::stdout();
-    let mut buf = [0u8; 8 * 1024];
+    let mut buf = [0u8; BUFFER_SIZE];
 
     loop {
         let n = stream.read(&mut buf)?;
