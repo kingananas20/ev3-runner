@@ -1,4 +1,5 @@
 use crate::BUFFER_SIZE;
+use sha2::{Digest, Sha256};
 use std::{
     fs::File,
     hash::Hasher as _,
@@ -6,7 +7,7 @@ use std::{
 };
 use twox_hash::XxHash64;
 
-pub fn calculate_hash(file: &mut BufReader<File>) -> Result<u64, Error> {
+pub fn hash_file(file: &mut BufReader<File>) -> Result<u64, Error> {
     let seed = 4167;
     let mut hasher = XxHash64::with_seed(seed);
 
@@ -21,4 +22,10 @@ pub fn calculate_hash(file: &mut BufReader<File>) -> Result<u64, Error> {
     }
 
     Ok(hasher.finish())
+}
+
+pub fn hash_password(password: &str) -> [u8; 32] {
+    let mut hasher = Sha256::new();
+    hasher.update(password);
+    hasher.finalize().into()
 }

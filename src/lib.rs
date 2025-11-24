@@ -1,11 +1,10 @@
-mod cli;
+pub mod cli;
 mod client;
 mod hash;
-mod protocol;
+pub mod protocol;
 mod server;
 
 pub use crate::client::client;
-pub use cli::{Cli, Commands};
 pub use server::server;
 
 const BUFFER_SIZE: usize = 64 * 1024;

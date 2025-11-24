@@ -1,3 +1,4 @@
+pub use clap::Parser;
 use std::path::PathBuf;
 
 #[derive(Debug, clap::Parser)]
@@ -32,8 +33,15 @@ pub enum Action {
 pub struct ClientArgs {
     /// Path of the file to upload and execute
     pub filepath: PathBuf,
-    /// Websocket of the server
+    /// Path of the file on the server
+    #[clap(short, long)]
+    pub remote_path: Option<PathBuf>,
+    /// Ip and port of the server in addr:port format
+    #[clap(default_value = "127.0.0.1:6767")]
     pub host: String,
+    /// Password for secure connection
+    #[clap(short, long, default_value = "maker")]
+    pub password: String,
 }
 
 #[derive(Debug, clap::Args)]
@@ -41,4 +49,7 @@ pub struct Server {
     /// Port of the local server
     #[clap(short, long, default_value = "6767")]
     pub server_port: u16,
+    /// Password of the server
+    #[clap(short, long, default_value = "maker")]
+    pub password: String,
 }

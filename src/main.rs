@@ -1,5 +1,7 @@
-use clap::Parser;
-use ev3_runner::{Cli, Commands, client, server, setup_logging};
+use ev3_runner::{
+    cli::{Cli, Commands, Parser},
+    client, server, setup_logging,
+};
 
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();

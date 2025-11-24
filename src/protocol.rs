@@ -7,6 +7,7 @@ pub struct Request {
     pub path: PathBuf,
     pub size: u64,
     pub hash: u64,
+    pub password: [u8; 32],
 }
 
 #[derive(Debug, Decode, Encode, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]

@@ -1,11 +1,12 @@
 use crate::BUFFER_SIZE;
 use crate::cli::Server;
-use crate::hash::calculate_hash;
+use crate::hash::{hash_file, hash_password};
 use crate::protocol::{Action, HashMatch, Request};
 use bincode::config::standard;
 use bincode::error::{DecodeError, EncodeError};
 use std::fs::{File, Permissions};
 use std::io::{BufReader, Error};
+use std::net::Shutdown;
 use std::os::unix::fs::PermissionsExt;
 use std::process::Command;
 use std::{
@@ -24,24 +25,29 @@ enum ServerError {
     Decode(#[from] DecodeError),
     #[error("Io error: {0}")]
     Io(#[from] Error),
+    #[error("Password hashes don't match")]
+    PasswordsDontMatch,
 }
 
 pub fn server(config: Server) -> io::Result<()> {
     let listener = TcpListener::bind(format!("0.0.0.0:{}", config.server_port))?;
     info!("Server listening on port {}", config.server_port);
 
+    let password_hash = hash_password(&config.password);
+    info!("Password hash calculated");
+
     loop {
         let (socket, addr) = listener.accept()?;
         info!("Accepted connection from {addr}");
 
-        if let Err(e) = handle_client(socket) {
+        if let Err(e) = handle_client(socket, password_hash) {
             warn!("Error while handling connection: {e}");
         }
     }
 }
 
-#[tracing::instrument]
-fn handle_client(mut socket: TcpStream) -> Result<(), ServerError> {
+#[tracing::instrument(skip(password_hash))]
+fn handle_client(mut socket: TcpStream, password_hash: [u8; 32]) -> Result<(), ServerError> {
     let mut len_buf = [0u8; 4];
     if let Err(e) = socket.read_exact(&mut len_buf) {
         warn!("Failed to read header length");
@@ -65,6 +71,12 @@ fn handle_client(mut socket: TcpStream) -> Result<(), ServerError> {
         }
     };
     trace!("header: {header:?}");
+
+    if header.password != password_hash {
+        socket.shutdown(Shutdown::Both)?;
+        return Err(ServerError::PasswordsDontMatch);
+    }
+    info!("Password match");
 
     let hash_match = check_hash(&header.path, header.hash)?;
     info!("Does the hash match? {:?}", hash_match);
@@ -96,7 +108,7 @@ fn check_hash(file_path: &Path, client_hash: u64) -> Result<HashMatch, Error> {
     let file = File::open(file_path)?;
     let mut reader = BufReader::new(file);
 
-    let hash = calculate_hash(&mut reader)?;
+    let hash = hash_file(&mut reader)?;
 
     debug!("hash: {hash} / client_hash: {client_hash}");
     if hash == client_hash {

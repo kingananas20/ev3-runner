@@ -1,7 +1,7 @@
 use crate::{
     BUFFER_SIZE,
     cli::{Action, Client},
-    hash::calculate_hash,
+    hash::{hash_file, hash_password},
     protocol::{self, HashMatch, Request},
 };
 use bincode::{
@@ -38,23 +38,29 @@ pub fn client(config: Client) -> Result<(), ClientError> {
         return Err(ClientError::PathNotValid(args.filepath));
     }
 
-    let Some(remote_path) = args.filepath.file_name() else {
-        return Err(ClientError::PathNotValid(args.filepath));
+    let remote_path = if let Some(remote_path) = args.remote_path {
+        remote_path
+    } else {
+        let Some(remote_path) = args.filepath.file_name() else {
+            return Err(ClientError::PathNotValid(args.filepath));
+        };
+        PathBuf::from(remote_path)
     };
-    let remote_path = PathBuf::from(remote_path);
 
     let file = File::open(&args.filepath)?;
     let file_size = file.metadata()?.len();
     let mut reader = BufReader::new(file);
 
-    let hash = calculate_hash(&mut reader)?;
+    let hash = hash_file(&mut reader)?;
     reader.rewind()?;
 
+    let password_hash = hash_password(&args.password);
     let request = Request {
         action,
         path: remote_path,
         size: file_size,
         hash,
+        password: password_hash,
     };
     let request = bincode::encode_to_vec(request, standard())?;
     let req_len_bytes = (request.len() as u32).to_be_bytes();
