@@ -169,7 +169,6 @@ fn run(socket: &mut TcpStream, path: &Path) -> Result<(), Error> {
     debug!("Running the file");
     let (mut reader, writer) = std::io::pipe()?;
     let mut child = match Command::new(path)
-        .arg("-h")
         .stdout(writer.try_clone()?)
         .stderr(writer)
         .spawn()
