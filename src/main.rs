@@ -2,6 +2,7 @@ use ev3_runner::{
     cli::{Cli, Commands, Parser},
     client, server, setup_logging,
 };
+use tracing::error;
 
 fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
@@ -9,7 +10,10 @@ fn main() -> anyhow::Result<()> {
 
     match cli.command {
         Commands::Server(config) => server(config)?,
-        Commands::Client(config) => client(config)?,
+        Commands::Client(config) => client(config).map_err(|e| {
+            error!("Error while handling connection with the server: {e}");
+            e
+        })?,
     }
 
     Ok(())

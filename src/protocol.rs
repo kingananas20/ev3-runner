@@ -17,6 +17,12 @@ pub enum Action {
 }
 
 #[derive(Debug, Decode, Encode, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+pub enum PasswordMatch {
+    Match,
+    NoMatch,
+}
+
+#[derive(Debug, Decode, Encode, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub enum HashMatch {
     Match,
     NoMatch,

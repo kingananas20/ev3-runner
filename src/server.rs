@@ -1,7 +1,7 @@
 use crate::BUFFER_SIZE;
 use crate::cli::Server;
 use crate::hash::{hash_file, hash_password};
-use crate::protocol::{Action, HashMatch, Request};
+use crate::protocol::{Action, HashMatch, PasswordMatch, Request};
 use bincode::config::standard;
 use bincode::error::{DecodeError, EncodeError};
 use std::fs::{File, Permissions};
@@ -46,6 +46,7 @@ pub fn server(config: Server) -> io::Result<()> {
     }
 }
 
+// todo!!! Create ClientHandler struct and impl the following functions as methods to it
 #[tracing::instrument(skip(password_hash))]
 fn handle_client(mut socket: TcpStream, password_hash: [u8; 32]) -> Result<(), ServerError> {
     let mut len_buf = [0u8; 4];
@@ -73,9 +74,17 @@ fn handle_client(mut socket: TcpStream, password_hash: [u8; 32]) -> Result<(), S
     trace!("header: {header:?}");
 
     if header.password != password_hash {
+        let password_res = bincode::encode_to_vec(PasswordMatch::NoMatch, standard())?;
+        let password_res_len = u32::to_be_bytes(password_res.len() as u32);
+        socket.write_all(&password_res_len)?;
+        socket.write_all(&password_res)?;
         socket.shutdown(Shutdown::Both)?;
         return Err(ServerError::PasswordsDontMatch);
     }
+    let password_res = bincode::encode_to_vec(PasswordMatch::Match, standard())?;
+    let password_res_len = u32::to_be_bytes(password_res.len() as u32);
+    socket.write_all(&password_res_len)?;
+    socket.write_all(&password_res)?;
     info!("Password match");
 
     let hash_match = check_hash(&header.path, header.hash)?;

@@ -2,7 +2,7 @@ use crate::{
     BUFFER_SIZE,
     cli::{Action, Client},
     hash::{hash_file, hash_password},
-    protocol::{self, HashMatch, Request},
+    protocol::{self, HashMatch, PasswordMatch, Request},
 };
 use bincode::{
     config::standard,
@@ -20,6 +20,8 @@ use tracing::info;
 pub enum ClientError {
     #[error("Path does not point to a file or the file doesn't exist: {0}")]
     PathNotValid(PathBuf),
+    #[error("Passwords not valid")]
+    PasswordNotValid,
     #[error("Io error: {0}")]
     Io(#[from] io::Error),
     #[error("Encode error: {0}")]
@@ -70,6 +72,16 @@ pub fn client(config: Client) -> Result<(), ClientError> {
 
     stream.write_all(&req_len_bytes)?;
     stream.write_all(&request)?;
+
+    let mut pwd_len = [0u8; 4];
+    stream.read_exact(&mut pwd_len)?;
+    let mut pwd_buf = vec![0u8; u32::from_be_bytes(pwd_len) as usize];
+    stream.read_exact(&mut pwd_buf)?;
+    let (pwd_match, _): (PasswordMatch, _) = bincode::decode_from_slice(&pwd_buf, standard())?;
+    if pwd_match == PasswordMatch::NoMatch {
+        return Err(ClientError::PasswordNotValid);
+    }
+    info!("Correct password");
 
     let mut res_len = [0u8; 4];
     stream.read_exact(&mut res_len)?;
