@@ -3,6 +3,7 @@ mod client;
 mod hash;
 pub mod protocol;
 mod server;
+mod transport;
 
 pub use crate::client::client;
 pub use server::server;

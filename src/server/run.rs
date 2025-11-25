@@ -1,13 +1,13 @@
-use crate::server::handler::ClientHandler;
+use crate::server::handler::{ClientHandler, HandlerError};
 use std::{
-    io::{self, Error},
+    io::{self},
     path::Path,
     process::Command,
 };
 use tracing::{debug, info, warn};
 
 impl ClientHandler {
-    pub(super) fn run(&mut self, path: &Path) -> Result<(), Error> {
+    pub(super) fn run(&mut self, path: &Path) -> Result<(), HandlerError> {
         debug!("Running the file at ./{}", path.display());
 
         let (mut reader, writer) = io::pipe()?;
@@ -21,10 +21,10 @@ impl ClientHandler {
                 e
             })?;
 
-        if let Err(e) = self.send_output(&mut reader) {
+        if let Err(e) = self.transport.send_output(&mut reader) {
             warn!("Failed to send output to client: {e}");
             child.kill()?;
-            return Err(e);
+            return Err(e.into());
         }
 
         let status = child.wait().map_err(|e| {

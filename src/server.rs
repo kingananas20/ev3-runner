@@ -1,7 +1,6 @@
 mod handler;
 mod hash;
 mod run;
-mod transport;
 mod upload;
 
 use crate::cli::Server;

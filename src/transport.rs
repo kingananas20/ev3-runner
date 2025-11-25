@@ -1,26 +1,45 @@
-use super::ClientHandler;
-use crate::{BUFFER_SIZE, server::handler::HandlerError};
+use crate::BUFFER_SIZE;
+use bincode::error::{DecodeError, EncodeError};
 use bincode::{Encode, config::standard, de::Decode};
+use std::net::TcpStream;
 use std::{
     cmp,
     io::{Error, Read, Write},
 };
 use tracing::{trace, warn};
 
-impl ClientHandler {
-    pub(super) fn read_and_decode<T>(&mut self) -> Result<T, HandlerError>
+#[derive(Debug, thiserror::Error)]
+pub enum TransportError {
+    #[error("Io error: {0}")]
+    Io(#[from] Error),
+    #[error("Decode error: {0}")]
+    Decode(#[from] DecodeError),
+    #[error("Encode error: {0}")]
+    Encode(#[from] EncodeError),
+}
+
+pub struct Transport {
+    pub stream: TcpStream,
+}
+
+impl Transport {
+    pub fn new(stream: TcpStream) -> Self {
+        Self { stream }
+    }
+
+    pub fn read_and_decode<T>(&mut self) -> Result<T, TransportError>
     where
         T: Decode<()>,
     {
         let mut len = [0u8; 4];
-        self.socket.read_exact(&mut len).map_err(|e| {
+        self.stream.read_exact(&mut len).map_err(|e| {
             warn!("Failed to read the data length from the socket: {e}");
             e
         })?;
         let size = u32::from_be_bytes(len) as usize;
 
         let mut buf = vec![0u8; size];
-        self.socket.read_exact(&mut buf).map_err(|e| {
+        self.stream.read_exact(&mut buf).map_err(|e| {
             warn!("Failed to read the data from the socket: {e}");
             e
         })?;
@@ -32,7 +51,7 @@ impl ClientHandler {
         Ok(data)
     }
 
-    pub(super) fn encode_and_write<T>(&mut self, data: T) -> Result<(), HandlerError>
+    pub fn encode_and_write<T>(&mut self, data: T) -> Result<(), TransportError>
     where
         T: Encode,
     {
@@ -43,18 +62,18 @@ impl ClientHandler {
         let len = encoded.len();
         let size = (len as u32).to_be_bytes();
 
-        self.socket.write_all(&size).map_err(|e| {
+        self.stream.write_all(&size).map_err(|e| {
             warn!("Failed to write the data length to the socket: {e}");
             e
         })?;
-        self.socket.write_all(&encoded).map_err(|e| {
+        self.stream.write_all(&encoded).map_err(|e| {
             warn!("Failed to write the data to the socket: {e}");
             e
         })?;
         Ok(())
     }
 
-    pub(super) fn receive_file<W>(&mut self, file: &mut W, size: u64) -> Result<(), Error>
+    pub fn receive_file<W>(&mut self, file: &mut W, size: u64) -> Result<(), TransportError>
     where
         W: Write,
     {
@@ -64,7 +83,7 @@ impl ClientHandler {
         while remaining > 0 {
             let to_read = cmp::min(remaining, BUFFER_SIZE);
 
-            self.socket.read_exact(&mut buf[..to_read]).map_err(|e| {
+            self.stream.read_exact(&mut buf[..to_read]).map_err(|e| {
                 warn!("Failed to read the file from the socket: {e}");
                 e
             })?;
@@ -81,7 +100,7 @@ impl ClientHandler {
         Ok(())
     }
 
-    pub(super) fn send_output<R>(&mut self, output: &mut R) -> Result<(), Error>
+    pub fn send_output<R>(&mut self, output: &mut R) -> Result<(), TransportError>
     where
         R: Read,
     {
@@ -94,7 +113,7 @@ impl ClientHandler {
             if n == 0 {
                 break;
             }
-            self.socket.write_all(&buf[..n]).map_err(|e| {
+            self.stream.write_all(&buf[..n]).map_err(|e| {
                 warn!("Failed to write output to the socket: {e}");
                 e
             })?;

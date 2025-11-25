@@ -1,4 +1,7 @@
-use crate::protocol::{Action, HashMatch, PasswordMatch, Request};
+use crate::{
+    protocol::{Action, HashMatch, PasswordMatch, Request},
+    transport::{Transport, TransportError},
+};
 use bincode::error::{DecodeError, EncodeError};
 use std::{
     io::Error,
@@ -7,30 +10,34 @@ use std::{
 use tracing::{debug, info};
 
 pub struct ClientHandler {
-    pub(super) socket: TcpStream,
+    pub(super) transport: Transport,
     pub(super) password: [u8; 32],
 }
 
 impl ClientHandler {
     pub fn new(socket: TcpStream, password: [u8; 32]) -> Self {
-        Self { socket, password }
+        let transport = Transport::new(socket);
+        Self {
+            transport,
+            password,
+        }
     }
 
     pub fn handle_client(&mut self) -> Result<(), HandlerError> {
-        let req: Request = self.read_and_decode()?;
+        let req: Request = self.transport.read_and_decode()?;
         debug!("Received request header: {req:?}");
 
         if req.password != self.password {
-            self.encode_and_write(PasswordMatch::NoMatch)?;
+            self.transport.encode_and_write(PasswordMatch::NoMatch)?;
             info!("Passwords did not match!");
             return Err(HandlerError::PasswordsDontMatch);
         } else {
             info!("Passwords matched!");
-            self.encode_and_write(PasswordMatch::Match)?;
+            self.transport.encode_and_write(PasswordMatch::Match)?;
         }
 
         let hash_match = Self::check_hash(&req.path, req.hash)?;
-        self.encode_and_write(hash_match)?;
+        self.transport.encode_and_write(hash_match)?;
 
         if hash_match == HashMatch::NoMatch {
             self.upload(&req.path, req.size)?;
@@ -39,13 +46,13 @@ impl ClientHandler {
 
         if req.action == Action::Upload {
             info!("Done with this client");
-            self.socket.shutdown(Shutdown::Both)?;
+            self.transport.stream.shutdown(Shutdown::Both)?;
             return Ok(());
         }
 
         self.run(&req.path)?;
 
-        self.socket.shutdown(Shutdown::Both)?;
+        self.transport.stream.shutdown(Shutdown::Both)?;
 
         Ok(())
     }
@@ -53,6 +60,8 @@ impl ClientHandler {
 
 #[derive(Debug, thiserror::Error)]
 pub(super) enum HandlerError {
+    #[error("Error in the transport layer: {0}")]
+    Transport(#[from] TransportError),
     #[error("Encode error: {0}")]
     Encode(#[from] EncodeError),
     #[error("Decode error: {0}")]

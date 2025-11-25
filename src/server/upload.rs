@@ -1,14 +1,13 @@
-use crate::server::handler::ClientHandler;
+use crate::server::handler::{ClientHandler, HandlerError};
 use std::{
     fs::{OpenOptions, Permissions},
-    io::Error,
     os::unix::fs::PermissionsExt,
     path::Path,
 };
 use tracing::{debug, trace, warn};
 
 impl ClientHandler {
-    pub(super) fn upload(&mut self, path: &Path, size: u64) -> Result<(), Error> {
+    pub(super) fn upload(&mut self, path: &Path, size: u64) -> Result<(), HandlerError> {
         debug!("Downloading file to {path:?} with the size of {size} bytes");
 
         let mut file = OpenOptions::new()
@@ -23,7 +22,7 @@ impl ClientHandler {
                 e
             })?;
 
-        self.receive_file(&mut file, size)?;
+        self.transport.receive_file(&mut file, size)?;
 
         if cfg!(target_os = "linux") {
             file.set_permissions(Permissions::from_mode(0o755))?;
