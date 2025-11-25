@@ -23,7 +23,7 @@ impl ClientHandler {
                 e
             })?;
 
-        self.download_file(&mut file, size)?;
+        self.receive_file(&mut file, size)?;
 
         if cfg!(target_os = "linux") {
             file.set_permissions(Permissions::from_mode(0o755))?;

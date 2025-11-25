@@ -1,6 +1,5 @@
-use crate::BUFFER_SIZE;
-
-use super::{ClientHandler, ServerError};
+use super::ClientHandler;
+use crate::{BUFFER_SIZE, server::handler::HandlerError};
 use bincode::{Encode, config::standard, de::Decode};
 use std::{
     cmp,
@@ -9,7 +8,7 @@ use std::{
 use tracing::{trace, warn};
 
 impl ClientHandler {
-    pub(super) fn read_and_decode<T>(&mut self) -> Result<T, ServerError>
+    pub(super) fn read_and_decode<T>(&mut self) -> Result<T, HandlerError>
     where
         T: Decode<()>,
     {
@@ -33,7 +32,7 @@ impl ClientHandler {
         Ok(data)
     }
 
-    pub(super) fn encode_and_write<T>(&mut self, data: T) -> Result<(), ServerError>
+    pub(super) fn encode_and_write<T>(&mut self, data: T) -> Result<(), HandlerError>
     where
         T: Encode,
     {
@@ -55,7 +54,7 @@ impl ClientHandler {
         Ok(())
     }
 
-    pub(super) fn download_file<W>(&mut self, file: &mut W, size: u64) -> Result<(), Error>
+    pub(super) fn receive_file<W>(&mut self, file: &mut W, size: u64) -> Result<(), Error>
     where
         W: Write,
     {
@@ -77,6 +76,28 @@ impl ClientHandler {
 
             remaining -= to_read;
             trace!("remaining: {remaining} / read: {to_read}");
+        }
+
+        Ok(())
+    }
+
+    pub(super) fn send_output<R>(&mut self, output: &mut R) -> Result<(), Error>
+    where
+        R: Read,
+    {
+        let mut buf = [0u8; BUFFER_SIZE];
+        loop {
+            let n = output.read(&mut buf).map_err(|e| {
+                warn!("Failed to read output of the spawned command: {e}");
+                e
+            })?;
+            if n == 0 {
+                break;
+            }
+            self.socket.write_all(&buf[..n]).map_err(|e| {
+                warn!("Failed to write output to the socket: {e}");
+                e
+            })?;
         }
 
         Ok(())
