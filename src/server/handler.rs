@@ -28,6 +28,9 @@ impl ClientHandler {
             self.encode_and_write(PasswordMatch::Match)?;
         }
 
+        let hash_match = Self::check_hash(&req.path, req.hash)?;
+        self.encode_and_write(hash_match)?;
+
         Ok(())
     }
 }

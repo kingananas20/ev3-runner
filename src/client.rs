@@ -1,7 +1,7 @@
 use crate::{
     BUFFER_SIZE,
     cli::{Action, Client},
-    hash::{hash_file, hash_password},
+    hash::Hasher,
     protocol::{self, HashMatch, PasswordMatch, Request},
 };
 use bincode::{
@@ -53,10 +53,10 @@ pub fn client(config: Client) -> Result<(), ClientError> {
     let file_size = file.metadata()?.len();
     let mut reader = BufReader::new(file);
 
-    let hash = hash_file(&mut reader)?;
+    let hash = Hasher::hash_file(&mut reader)?;
     reader.rewind()?;
 
-    let password_hash = hash_password(&args.password);
+    let password_hash = Hasher::hash_password(&args.password);
     let request = Request {
         action,
         path: remote_path,

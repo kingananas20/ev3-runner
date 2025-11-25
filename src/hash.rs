@@ -7,25 +7,29 @@ use std::{
 };
 use twox_hash::XxHash64;
 
-pub fn hash_file(file: &mut BufReader<File>) -> Result<u64, Error> {
-    let seed = 4167;
-    let mut hasher = XxHash64::with_seed(seed);
+pub struct Hasher;
 
-    let mut buf = [0u8; BUFFER_SIZE];
+impl Hasher {
+    pub fn hash_file(file: &mut BufReader<File>) -> Result<u64, Error> {
+        let seed = 4167;
+        let mut hasher = XxHash64::with_seed(seed);
 
-    loop {
-        let n = file.read(&mut buf)?;
-        if n == 0 {
-            break;
+        let mut buf = [0u8; BUFFER_SIZE];
+
+        loop {
+            let n = file.read(&mut buf)?;
+            if n == 0 {
+                break;
+            }
+            hasher.write(&buf[..n]);
         }
-        hasher.write(&buf[..n]);
+
+        Ok(hasher.finish())
     }
 
-    Ok(hasher.finish())
-}
-
-pub fn hash_password(password: &str) -> [u8; 32] {
-    let mut hasher = Sha256::new();
-    hasher.update(password);
-    hasher.finalize().into()
+    pub fn hash_password(password: &str) -> [u8; 32] {
+        let mut hasher = Sha256::new();
+        hasher.update(password);
+        hasher.finalize().into()
+    }
 }

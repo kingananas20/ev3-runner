@@ -4,7 +4,7 @@ mod transport;
 
 use crate::BUFFER_SIZE;
 use crate::cli::Server;
-use crate::hash::{hash_file, hash_password};
+use crate::hash::Hasher;
 use crate::protocol::{Action, HashMatch, PasswordMatch, Request};
 use bincode::config::standard;
 use bincode::error::{DecodeError, EncodeError};
@@ -38,7 +38,7 @@ pub fn server(config: Server) -> io::Result<()> {
     let listener = TcpListener::bind(format!("0.0.0.0:{}", config.server_port))?;
     info!("Server listening on port {}", config.server_port);
 
-    let password_hash = hash_password(&config.password);
+    let password_hash = Hasher::hash_password(&config.password);
     info!("Password hash calculated");
 
     loop {
@@ -122,7 +122,7 @@ fn check_hash(file_path: &Path, client_hash: u64) -> Result<HashMatch, Error> {
     let file = File::open(file_path)?;
     let mut reader = BufReader::new(file);
 
-    let hash = hash_file(&mut reader)?;
+    let hash = Hasher::hash_file(&mut reader)?;
 
     debug!("hash: {hash} / client_hash: {client_hash}");
     if hash == client_hash {
