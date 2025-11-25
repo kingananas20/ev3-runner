@@ -21,5 +21,6 @@ pub fn setup_logging(verbosity: u8) {
         2 => subscriber.with_max_level(Level::DEBUG),
         3.. => subscriber.with_max_level(Level::TRACE),
     };
+    let subscriber = subscriber.with_file(true).with_line_number(true);
     subscriber.init();
 }

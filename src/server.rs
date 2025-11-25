@@ -1,9 +1,14 @@
+mod handler;
+mod hash;
+mod transport;
+
 use crate::BUFFER_SIZE;
 use crate::cli::Server;
 use crate::hash::{hash_file, hash_password};
 use crate::protocol::{Action, HashMatch, PasswordMatch, Request};
 use bincode::config::standard;
 use bincode::error::{DecodeError, EncodeError};
+use handler::ClientHandler;
 use std::fs::{File, Permissions};
 use std::io::{BufReader, Error};
 use std::net::Shutdown;
