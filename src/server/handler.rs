@@ -1,8 +1,8 @@
 use crate::{
-    protocol::{PasswordMatch, Request},
+    protocol::{Action, HashMatch, PasswordMatch, Request},
     server::ServerError,
 };
-use std::net::TcpStream;
+use std::net::{Shutdown, TcpStream};
 use tracing::{debug, info};
 
 pub struct ClientHandler {
@@ -30,6 +30,17 @@ impl ClientHandler {
 
         let hash_match = Self::check_hash(&req.path, req.hash)?;
         self.encode_and_write(hash_match)?;
+
+        if hash_match == HashMatch::NoMatch {
+            self.upload(&req.path, req.size)?;
+            info!("File received successfully");
+        }
+
+        if req.action == Action::Upload {
+            info!("Done with this client");
+            self.socket.shutdown(Shutdown::Both)?;
+            return Ok(());
+        }
 
         Ok(())
     }

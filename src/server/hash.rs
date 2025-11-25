@@ -8,12 +8,12 @@ use std::{
 use tracing::{debug, info, warn};
 
 impl ClientHandler {
-    pub(super) fn check_hash(file_path: &Path, remote_hash: u64) -> Result<HashMatch, io::Error> {
-        if !file_path.exists() || file_path.is_dir() {
+    pub(super) fn check_hash(path: &Path, remote_hash: u64) -> Result<HashMatch, io::Error> {
+        if !path.exists() || path.is_dir() {
             return Ok(HashMatch::NoMatch);
         }
 
-        let file = File::open(file_path).map_err(|e| {
+        let file = File::open(path).map_err(|e| {
             warn!("Failed to open the file: {e}");
             e
         })?;
