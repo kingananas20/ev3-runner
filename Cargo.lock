@@ -170,7 +170,7 @@ dependencies = [
 
 [[package]]
 name = "ev3-runner"
-version = "0.1.0"
+version = "1.0.1"
 dependencies = [
  "anyhow",
  "bincode",

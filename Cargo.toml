@@ -1,9 +1,9 @@
 [package]
 name = "ev3-runner"
-version = "0.1.0"
+version = "1.0.1"
 edition = "2024"
 license = "MIT"
-description = "Tool to upload and run binaries on a LEGO ev3"
+description = "A command-line tool to upload and run binaries on LEGO EV3 robots running ev3dev over TCP."
 repository = "https://github.com/kingananas20/ev3-runner"
 readme = "README.md"
 keywords = ["cli", "ev3dev", "ssh", "tcp"]
