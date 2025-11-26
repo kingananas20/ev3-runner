@@ -9,6 +9,7 @@ pub use crate::client::client;
 pub use server::server;
 
 const BUFFER_SIZE: usize = 64 * 1024;
+const VERSION: &str = env!("CARGO_PKG_VERSION");
 
 // Logging
 use tracing::Level;

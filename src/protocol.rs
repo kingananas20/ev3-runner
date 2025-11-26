@@ -8,6 +8,7 @@ pub struct Request {
     pub size: u64,
     pub hash: u64,
     pub password: [u8; 32],
+    pub version: String,
 }
 
 impl Debug for Request {
@@ -28,14 +29,31 @@ pub enum Action {
     Run,
 }
 
-#[derive(Debug, Decode, Encode, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
-pub enum PasswordMatch {
-    Match,
-    NoMatch,
+#[derive(Debug, Decode, Encode, PartialEq, Eq, PartialOrd, Ord, Clone)]
+pub struct Verification {
+    pub password: MatchStatus,
+    pub hash: MatchStatus,
+    pub version: VersionStatus,
+}
+
+impl Default for Verification {
+    fn default() -> Self {
+        Self {
+            password: MatchStatus::Mismatch,
+            hash: MatchStatus::Mismatch,
+            version: VersionStatus::Mismatch("default".to_owned()),
+        }
+    }
 }
 
 #[derive(Debug, Decode, Encode, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
-pub enum HashMatch {
+pub enum MatchStatus {
     Match,
-    NoMatch,
+    Mismatch,
+}
+
+#[derive(Debug, Decode, Encode, PartialEq, Eq, PartialOrd, Ord, Clone)]
+pub enum VersionStatus {
+    Match,
+    Mismatch(String),
 }

@@ -1,7 +1,8 @@
 use crate::{
+    VERSION,
     cli::ClientArgs,
     hash::Hasher,
-    protocol::{Action, HashMatch, PasswordMatch, Request},
+    protocol::{Action, MatchStatus, Request, Verification, VersionStatus},
     transport::{Transport, TransportError},
 };
 use bincode::error::{DecodeError, EncodeError};
@@ -11,7 +12,7 @@ use std::{
     net::Shutdown,
     path::PathBuf,
 };
-use tracing::info;
+use tracing::{error, info};
 
 #[derive(Debug, thiserror::Error)]
 pub enum ClientError {
@@ -19,6 +20,8 @@ pub enum ClientError {
     PathNotValid(PathBuf),
     #[error("Passwords not valid")]
     PasswordNotValid,
+    #[error("Version mismatch: {0}")]
+    VersionMismatch(String),
     #[error("Error in transport layer: {0}")]
     Transport(#[from] TransportError),
     #[error("Io error: {0}")]
@@ -50,14 +53,21 @@ impl ClientSession {
 
         self.transport.encode_and_write(&req)?;
 
-        let pwd_match = self.transport.read_and_decode::<PasswordMatch>()?;
-        if pwd_match == PasswordMatch::NoMatch {
+        let verification = self.transport.read_and_decode::<Verification>()?;
+
+        if let VersionStatus::Mismatch(version) = verification.version {
+            error!(
+                "Version of the client and server do not match. Server version: {version} / Your version: {VERSION}"
+            );
+            return Err(ClientError::VersionMismatch(version));
+        }
+
+        if verification.password == MatchStatus::Mismatch {
             return Err(ClientError::PasswordNotValid);
         }
         info!("Password correct");
 
-        let hash_match = self.transport.read_and_decode::<HashMatch>()?;
-        if hash_match == HashMatch::NoMatch {
+        if verification.hash == MatchStatus::Mismatch {
             info!("Uploading file because remote hash did not match");
             self.transport.send_file(&mut reader, req.size)?;
         } else {
@@ -107,6 +117,7 @@ impl ClientSession {
             size: file_size,
             hash,
             password: password_hash,
+            version: VERSION.to_string(),
         };
 
         Ok((request, reader))

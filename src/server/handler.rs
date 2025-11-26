@@ -1,5 +1,6 @@
 use crate::{
-    protocol::{Action, HashMatch, PasswordMatch, Request},
+    VERSION,
+    protocol::{Action, MatchStatus, Request, Verification, VersionStatus},
     transport::{Transport, TransportError},
 };
 use bincode::error::{DecodeError, EncodeError};
@@ -27,32 +28,40 @@ impl ClientHandler {
         let req: Request = self.transport.read_and_decode()?;
         debug!("Received request header: {req:?}");
 
+        let mut verification = Verification::default();
+
+        if req.version != VERSION {
+            verification.version = VersionStatus::Mismatch(VERSION.to_owned());
+            self.transport.encode_and_write(verification)?;
+            self.transport.shutdown(Shutdown::Both)?;
+            return Err(HandlerError::VersionMismatch(VERSION.to_owned()));
+        }
+
         if req.password != self.password {
-            self.transport.encode_and_write(PasswordMatch::NoMatch)?;
+            self.transport.encode_and_write(verification)?;
+            self.transport.shutdown(Shutdown::Both)?;
             info!("Passwords did not match!");
             return Err(HandlerError::PasswordsDontMatch);
         } else {
+            verification.password = MatchStatus::Match;
             info!("Passwords matched!");
-            self.transport.encode_and_write(PasswordMatch::Match)?;
         }
 
-        let hash_match = Self::check_hash(&req.path, req.hash)?;
-        self.transport.encode_and_write(hash_match)?;
-
-        if hash_match == HashMatch::NoMatch {
+        verification.hash = Self::check_hash(&req.path, req.hash)?;
+        if verification.hash == MatchStatus::Mismatch {
             self.upload(&req.path, req.size)?;
             info!("File received successfully");
         }
 
         if req.action == Action::Upload {
             info!("Done with this client");
-            self.transport.stream.shutdown(Shutdown::Both)?;
+            self.transport.shutdown(Shutdown::Both)?;
             return Ok(());
         }
 
         self.run(&req.path)?;
 
-        self.transport.stream.shutdown(Shutdown::Both)?;
+        self.transport.shutdown(Shutdown::Both)?;
 
         Ok(())
     }
@@ -70,4 +79,6 @@ pub(super) enum HandlerError {
     Io(#[from] Error),
     #[error("Password hashes don't match")]
     PasswordsDontMatch,
+    #[error("Version mismatch: {0}")]
+    VersionMismatch(String),
 }

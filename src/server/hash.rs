@@ -1,5 +1,5 @@
 use super::ClientHandler;
-use crate::{hash::Hasher, protocol::HashMatch};
+use crate::{hash::Hasher, protocol::MatchStatus};
 use std::{
     fs::File,
     io::{self, BufReader},
@@ -8,9 +8,9 @@ use std::{
 use tracing::{debug, info, warn};
 
 impl ClientHandler {
-    pub(super) fn check_hash(path: &Path, remote_hash: u64) -> Result<HashMatch, io::Error> {
+    pub(super) fn check_hash(path: &Path, remote_hash: u64) -> Result<MatchStatus, io::Error> {
         if !path.exists() || path.is_dir() {
-            return Ok(HashMatch::NoMatch);
+            return Ok(MatchStatus::Mismatch);
         }
 
         let file = File::open(path).map_err(|e| {
@@ -27,10 +27,10 @@ impl ClientHandler {
         debug!("hash: {hash} / remote_hash: {remote_hash}");
         if hash != remote_hash {
             info!("Hashes don't match");
-            return Ok(HashMatch::NoMatch);
+            return Ok(MatchStatus::Mismatch);
         }
 
         info!("Hashes match");
-        Ok(HashMatch::Match)
+        Ok(MatchStatus::Match)
     }
 }
