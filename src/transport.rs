@@ -1,7 +1,7 @@
 use crate::BUFFER_SIZE;
 use bincode::error::{DecodeError, EncodeError};
 use bincode::{Encode, config::standard, de::Decode};
-use std::net::TcpStream;
+use std::net::{Shutdown, TcpStream};
 use std::ops::{Deref, DerefMut};
 use std::{
     cmp,
@@ -193,5 +193,12 @@ impl Deref for Transport {
 impl DerefMut for Transport {
     fn deref_mut(&mut self) -> &mut Self::Target {
         &mut self.stream
+    }
+}
+
+impl Drop for Transport {
+    fn drop(&mut self) {
+        self.stream.flush().ok();
+        self.stream.shutdown(Shutdown::Both).ok();
     }
 }
