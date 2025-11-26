@@ -1,0 +1,48 @@
+name: "Build and release"
+
+on:
+    push:
+        tags:
+            - "tv*"
+
+jobs:
+    build_ev3:
+        name: Build for the ev3
+        runs-on: ubuntu-latest
+
+        steps:
+            - name: Checkout repo
+              uses: actions/checkout@v4
+
+            - name: Set up Rust
+              uses: actions-rust-lang/setup-rust-toolchain@v1
+              with:
+                  toolchain: stable
+                  target: armv5te-unknown-linux-musleabi
+
+            - name: Build release binary
+              run: cargo build --release --target armv5te-unknown-linux-musleabi
+
+            - name: Upload artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: EV3 release
+                  path: target/armv5te-unknown-linux-musleabi/release/ev3-runner
+
+    release:
+        name: Upload the files to the release
+        runs-on: ubuntu-latest
+        needs: build_ev3
+
+        steps:
+            - name: Get artifacts
+              uses: actions/download-artifact@v4
+              with:
+                  path: ./artifacts
+
+            - name: Create GitHub Release
+              uses: softprops/action-gh-release@v2
+              with:
+                  files: artifacts/**/*
+              env:
+                  GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
