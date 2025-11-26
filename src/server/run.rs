@@ -38,7 +38,7 @@ impl ClientHandler {
             warn!("Child exited with exit status: {status}");
         }
 
-        debug!("Ran file at {path:?}");
+        debug!("Ran file at ./{}", path.display());
 
         Ok(())
     }
