@@ -38,11 +38,14 @@ jobs:
             - name: Get artifacts
               uses: actions/download-artifact@v4
               with:
-                  path: ./artifacts
+                  name: EV3 release
+
+            - name: Display download
+              run: ls -R
 
             - name: Create GitHub Release
               uses: softprops/action-gh-release@v2
               with:
-                  files: artifacts/**/*
+                  files: ev3-runner
               env:
                   GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
