@@ -1,4 +1,5 @@
 mod clientsession;
+mod version;
 
 use crate::{
     cli::{Action, Client},

@@ -1,10 +1,7 @@
 use crate::{
-    VERSION,
     cli::ClientArgs,
     hash::Hasher,
-    protocol::{
-        Action, MatchStatus, Request, Verification, VersionHeader, VersionResponse, VersionStatus,
-    },
+    protocol::{Action, MatchStatus, Request, Verification},
     transport::{Transport, TransportError},
 };
 use bincode::error::{DecodeError, EncodeError};
@@ -51,13 +48,7 @@ impl ClientSession {
     }
 
     pub fn dispatch(&mut self) -> Result<(), ClientError> {
-        self.transport
-            .encode_and_write(VersionHeader(VERSION.to_owned()))?;
-        let version_status = self.transport.read_and_decode::<VersionResponse>()?;
-        if let VersionResponse(VersionStatus::Mismatch(server_version)) = version_status {
-            error!("Server version ({server_version}) does not match client version ({VERSION})");
-            return Err(ClientError::VersionMismatch(server_version));
-        }
+        self.check_version()?;
 
         let (req, mut reader) = self.setup()?;
         self.transport.encode_and_write(&req)?;
