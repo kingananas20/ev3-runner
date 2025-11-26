@@ -2,7 +2,9 @@ use crate::{
     VERSION,
     cli::ClientArgs,
     hash::Hasher,
-    protocol::{Action, MatchStatus, Request, Verification, VersionStatus},
+    protocol::{
+        Action, MatchStatus, Request, Verification, VersionHeader, VersionResponse, VersionStatus,
+    },
     transport::{Transport, TransportError},
 };
 use bincode::error::{DecodeError, EncodeError};
@@ -49,18 +51,18 @@ impl ClientSession {
     }
 
     pub fn dispatch(&mut self) -> Result<(), ClientError> {
-        let (req, mut reader) = self.setup()?;
+        self.transport
+            .encode_and_write(VersionHeader(VERSION.to_owned()))?;
+        let version_status = self.transport.read_and_decode::<VersionResponse>()?;
+        if let VersionResponse(VersionStatus::Mismatch(server_version)) = version_status {
+            error!("Server version ({server_version}) does not match client version ({VERSION})");
+            return Err(ClientError::VersionMismatch(server_version));
+        }
 
+        let (req, mut reader) = self.setup()?;
         self.transport.encode_and_write(&req)?;
 
         let verification = self.transport.read_and_decode::<Verification>()?;
-
-        if let VersionStatus::Mismatch(version) = verification.version {
-            error!(
-                "Version of the client and server do not match. Server version: {version} / Your version: {VERSION}"
-            );
-            return Err(ClientError::VersionMismatch(version));
-        }
 
         if verification.password == MatchStatus::Mismatch {
             return Err(ClientError::PasswordNotValid);
@@ -117,7 +119,6 @@ impl ClientSession {
             size: file_size,
             hash,
             password: password_hash,
-            version: VERSION.to_string(),
         };
 
         Ok((request, reader))

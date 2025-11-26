@@ -1,6 +1,8 @@
 use crate::{
     VERSION,
-    protocol::{Action, MatchStatus, Request, Verification, VersionStatus},
+    protocol::{
+        Action, MatchStatus, Request, Verification, VersionHeader, VersionResponse, VersionStatus,
+    },
     transport::{Transport, TransportError},
 };
 use bincode::error::{DecodeError, EncodeError};
@@ -25,17 +27,20 @@ impl ClientHandler {
     }
 
     pub fn handle_client(&mut self) -> Result<(), HandlerError> {
+        let version_header = self.transport.read_and_decode::<VersionHeader>()?;
+        let mut version_response = VersionResponse(VersionStatus::Match);
+        if version_header.0 != VERSION {
+            version_response = VersionResponse(VersionStatus::Mismatch(VERSION.to_owned()));
+            self.transport.encode_and_write(version_response)?;
+            return Err(HandlerError::VersionMismatch(VERSION.to_owned()));
+        } else {
+            self.transport.encode_and_write(version_response)?;
+        }
+
         let req: Request = self.transport.read_and_decode()?;
         debug!("Received request header: {req:?}");
 
         let mut verification = Verification::default();
-
-        if req.version != VERSION {
-            verification.version = VersionStatus::Mismatch(VERSION.to_owned());
-            self.transport.encode_and_write(verification)?;
-            self.transport.shutdown(Shutdown::Both)?;
-            return Err(HandlerError::VersionMismatch(VERSION.to_owned()));
-        }
 
         if req.password != self.password {
             self.transport.encode_and_write(verification)?;

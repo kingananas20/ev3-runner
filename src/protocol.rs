@@ -1,6 +1,18 @@
 use bincode::{Decode, Encode};
 use std::{fmt::Debug, path::PathBuf};
 
+#[derive(Debug, Decode, Encode, PartialEq, Eq, PartialOrd, Ord, Clone)]
+pub struct VersionHeader(pub String);
+
+#[derive(Debug, Decode, Encode, PartialEq, Eq, PartialOrd, Ord, Clone)]
+pub struct VersionResponse(pub VersionStatus);
+
+#[derive(Debug, Decode, Encode, PartialEq, Eq, PartialOrd, Ord, Clone)]
+pub enum VersionStatus {
+    Match,
+    Mismatch(String),
+}
+
 #[derive(Decode, Encode, PartialEq, Eq, PartialOrd, Ord, Clone)]
 pub struct Request {
     pub action: Action,
@@ -8,7 +20,6 @@ pub struct Request {
     pub size: u64,
     pub hash: u64,
     pub password: [u8; 32],
-    pub version: String,
 }
 
 impl Debug for Request {
@@ -33,7 +44,6 @@ pub enum Action {
 pub struct Verification {
     pub password: MatchStatus,
     pub hash: MatchStatus,
-    pub version: VersionStatus,
 }
 
 impl Default for Verification {
@@ -41,7 +51,6 @@ impl Default for Verification {
         Self {
             password: MatchStatus::Mismatch,
             hash: MatchStatus::Mismatch,
-            version: VersionStatus::Mismatch("default".to_owned()),
         }
     }
 }
@@ -50,10 +59,4 @@ impl Default for Verification {
 pub enum MatchStatus {
     Match,
     Mismatch,
-}
-
-#[derive(Debug, Decode, Encode, PartialEq, Eq, PartialOrd, Ord, Clone)]
-pub enum VersionStatus {
-    Match,
-    Mismatch(String),
 }
