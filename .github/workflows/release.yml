@@ -3,7 +3,7 @@ name: "Build and release"
 on:
     push:
         tags:
-            - "tv*"
+            - "v*"
 
 jobs:
     build_ev3:
