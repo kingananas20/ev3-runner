@@ -53,7 +53,6 @@ impl ClientSession {
         let (req, reader) = self.setup()?;
         self.transport.encode_and_write(&req)?;
 
-        info!("1");
         self.verification(req, reader)?;
 
         if self.action == Action::Upload {

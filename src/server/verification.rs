@@ -16,12 +16,16 @@ impl ClientHandler {
         }
 
         verification.hash = Self::check_hash(&req.path, req.hash)?;
+        self.transport.encode_and_write(&verification)?;
+
         if verification.hash == MatchStatus::Mismatch {
             self.upload(&req.path, req.size)?;
             info!("File received successfully");
         }
 
-        self.transport.encode_and_write(verification)?;
+        #[cfg(unix)]
+        self.set_permissions(&req.path)?;
+
         Ok(())
     }
 }
