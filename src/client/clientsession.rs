@@ -1,7 +1,7 @@
 use crate::{
     cli::ClientArgs,
     hash::Hasher,
-    protocol::{Action, MatchStatus, Request, Verification},
+    protocol::{Action, Request},
     transport::{Transport, TransportError},
 };
 use bincode::error::{DecodeError, EncodeError};
@@ -50,22 +50,11 @@ impl ClientSession {
     pub fn dispatch(&mut self) -> Result<(), ClientError> {
         self.check_version()?;
 
-        let (req, mut reader) = self.setup()?;
+        let (req, reader) = self.setup()?;
         self.transport.encode_and_write(&req)?;
 
-        let verification = self.transport.read_and_decode::<Verification>()?;
-
-        if verification.password == MatchStatus::Mismatch {
-            return Err(ClientError::PasswordNotValid);
-        }
-        info!("Password correct");
-
-        if verification.hash == MatchStatus::Mismatch {
-            info!("Uploading file because remote hash did not match");
-            self.transport.send_file(&mut reader, req.size)?;
-        } else {
-            info!("Remote file already up to date, no upload needed");
-        }
+        info!("1");
+        self.verification(req, reader)?;
 
         if self.action == Action::Upload {
             info!("Done with this session");

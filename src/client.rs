@@ -1,4 +1,5 @@
 mod clientsession;
+mod verification;
 mod version;
 
 use crate::{

@@ -2,6 +2,7 @@ mod handler;
 mod hash;
 mod run;
 mod upload;
+mod verification;
 mod version;
 
 use crate::cli::Server;

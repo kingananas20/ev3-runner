@@ -1,12 +1,9 @@
 use crate::{
-    protocol::{Action, MatchStatus, Request, Verification},
+    protocol::{Action, Request},
     transport::{Transport, TransportError},
 };
 use bincode::error::{DecodeError, EncodeError};
-use std::{
-    io::Error,
-    net::{Shutdown, TcpStream},
-};
+use std::{io::Error, net::TcpStream};
 use tracing::{debug, info};
 
 pub struct ClientHandler {
@@ -29,32 +26,14 @@ impl ClientHandler {
         let req: Request = self.transport.read_and_decode()?;
         debug!("Received request header: {req:?}");
 
-        let mut verification = Verification::default();
-
-        if req.password != self.password {
-            self.transport.encode_and_write(verification)?;
-            info!("Passwords did not match!");
-            return Err(HandlerError::PasswordsDontMatch);
-        } else {
-            verification.password = MatchStatus::Match;
-            info!("Passwords matched!");
-        }
-
-        verification.hash = Self::check_hash(&req.path, req.hash)?;
-        if verification.hash == MatchStatus::Mismatch {
-            self.upload(&req.path, req.size)?;
-            info!("File received successfully");
-        }
+        self.verification(&req)?;
 
         if req.action == Action::Upload {
             info!("Done with this client");
-            self.transport.shutdown(Shutdown::Both)?;
             return Ok(());
         }
 
         self.run(&req.path)?;
-
-        self.transport.shutdown(Shutdown::Both)?;
 
         Ok(())
     }
