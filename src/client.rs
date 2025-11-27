@@ -10,9 +10,9 @@ use crate::{
 use clientsession::ClientError;
 
 pub fn client(config: Client) -> Result<(), ClientError> {
-    let (args, action) = match config.action {
-        Action::Upload(args) => (args, protocol::Action::Upload),
-        Action::Run(args) => (args, protocol::Action::Run),
+    let (action, args) = match config.action {
+        Action::Upload(args) => (protocol::Action::Upload, args),
+        Action::Run(args) => (protocol::Action::Run(args.brickrun), args),
     };
 
     let mut session = ClientSession::connect(args, action)?;

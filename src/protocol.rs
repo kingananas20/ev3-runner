@@ -37,7 +37,7 @@ impl Debug for Request {
 #[derive(Debug, Decode, Encode, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub enum Action {
     Upload,
-    Run,
+    Run(bool),
 }
 
 #[derive(Debug, Decode, Encode, PartialEq, Eq, PartialOrd, Ord, Clone)]

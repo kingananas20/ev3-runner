@@ -7,12 +7,17 @@ use std::{
 use tracing::{debug, info, warn};
 
 impl ClientHandler {
-    pub(super) fn run(&mut self, path: &Path) -> Result<(), HandlerError> {
+    pub(super) fn run(&mut self, path: &Path, brickrun: bool) -> Result<(), HandlerError> {
         debug!("Running the file at ./{}", path.display());
 
         let (mut reader, writer) = io::pipe()?;
 
-        let mut child = Command::new(format!("./{}", path.display()))
+        let command = if brickrun {
+            format!("brickrun ./{}", path.display())
+        } else {
+            format!("./{}", path.display())
+        };
+        let mut child = Command::new(command)
             .stdout(writer.try_clone()?)
             .stderr(writer)
             .spawn()

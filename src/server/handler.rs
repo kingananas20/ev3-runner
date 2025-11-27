@@ -33,7 +33,9 @@ impl ClientHandler {
             return Ok(());
         }
 
-        self.run(&req.path)?;
+        if let Action::Run(brickrun) = req.action {
+            self.run(&req.path, brickrun)?;
+        }
 
         Ok(())
     }

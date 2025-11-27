@@ -66,6 +66,14 @@ pub struct ClientArgs {
     #[arg(value_name = "FILE")]
     pub filepath: PathBuf,
 
+    /// Server address and port
+    #[clap(
+        default_value = "127.0.0.1:6767",
+        value_name = "HOST:PORT",
+        help = "Server address in format IP:PORT"
+    )]
+    pub host: String,
+
     /// Where to save the file on the server
     #[clap(
         short,
@@ -74,14 +82,6 @@ pub struct ClientArgs {
         help = "Remote file path (default: same filename as local)"
     )]
     pub remote_path: Option<PathBuf>,
-
-    /// Server address and port
-    #[clap(
-        default_value = "127.0.0.1:6767",
-        value_name = "HOST:PORT",
-        help = "Server address in format IP:PORT"
-    )]
-    pub host: String,
 
     /// Password for authentication
     #[clap(
@@ -92,6 +92,10 @@ pub struct ClientArgs {
         help = "Password to authenticate with the server"
     )]
     pub password: String,
+
+    /// Use brickrun
+    #[clap(short, long, action = clap::ArgAction::SetFalse, help = "If the program should be started using brickrun")]
+    pub brickrun: bool,
 }
 
 #[derive(Debug, clap::Args)]
