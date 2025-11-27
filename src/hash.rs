@@ -10,9 +10,10 @@ use twox_hash::XxHash64;
 pub struct Hasher;
 
 impl Hasher {
+    const SEED: u64 = 4167;
+
     pub fn hash_file(file: &mut BufReader<File>) -> Result<u64, Error> {
-        let seed = 4167;
-        let mut hasher = XxHash64::with_seed(seed);
+        let mut hasher = XxHash64::with_seed(Self::SEED);
 
         let mut buf = [0u8; BUFFER_SIZE];
 
