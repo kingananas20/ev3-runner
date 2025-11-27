@@ -1,7 +1,7 @@
 use crate::{
     cli::ClientArgs,
     hash::Hasher,
-    protocol::{Action, Request},
+    protocol::{Action, PathStatus, Request},
     transport::{Transport, TransportError},
 };
 use bincode::error::{DecodeError, EncodeError};
@@ -17,6 +17,8 @@ use tracing::{error, info};
 pub enum ClientError {
     #[error("Path does not point to a file or the file doesn't exist: {0}")]
     PathNotValid(PathBuf),
+    #[error("Remote path is not valid: {0}")]
+    RemotePath(#[from] PathStatus),
     #[error("Passwords not valid")]
     PasswordNotValid,
     #[error("Version mismatch: {0}")]
@@ -53,7 +55,7 @@ impl ClientSession {
         let (req, reader) = self.setup()?;
         self.transport.encode_and_write(&req)?;
 
-        self.verification(req, reader)?;
+        self.validation(req, reader)?;
 
         if self.action == Action::Upload {
             info!("Done with this session");

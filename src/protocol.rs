@@ -40,17 +40,19 @@ pub enum Action {
     Run(bool),
 }
 
-#[derive(Debug, Decode, Encode, PartialEq, Eq, PartialOrd, Ord, Clone)]
-pub struct Verification {
+#[derive(Debug, Decode, Encode, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+pub struct Validation {
     pub password: MatchStatus,
     pub hash: MatchStatus,
+    pub path: PathStatus,
 }
 
-impl Default for Verification {
+impl Default for Validation {
     fn default() -> Self {
         Self {
             password: MatchStatus::Mismatch,
             hash: MatchStatus::Mismatch,
+            path: PathStatus::Valid,
         }
     }
 }
@@ -59,4 +61,18 @@ impl Default for Verification {
 pub enum MatchStatus {
     Match,
     Mismatch,
+}
+
+#[derive(Debug, Decode, Encode, PartialEq, Eq, PartialOrd, Ord, Clone, Copy, thiserror::Error)]
+pub enum PathStatus {
+    #[error("Path is valid. This isn't an error")]
+    Valid,
+    #[error("Path contains invalid components (e.g., '..')")]
+    InvalidComponents,
+    #[error("Path is absolute, only relative paths allowed")]
+    AbsolutePath,
+    #[error("Path would escape working directory")]
+    EscapesWorkingDir,
+    #[error("Failed to canonicalize path")]
+    CanonicalizationFailed,
 }

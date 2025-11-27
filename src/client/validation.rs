@@ -1,24 +1,30 @@
 use crate::client::clientsession::{ClientError, ClientSession};
-use crate::protocol::{MatchStatus, Request, Verification};
+use crate::protocol::{MatchStatus, PathStatus, Request, Validation};
 use std::fs::File;
 use std::io::BufReader;
 use tracing::{error, info};
 
 impl ClientSession {
-    pub(super) fn verification(
+    pub(super) fn validation(
         &mut self,
         req: Request,
         mut reader: BufReader<File>,
     ) -> Result<(), ClientError> {
-        let verification = self.transport.read_and_decode::<Verification>()?;
+        let validation = self.transport.read_and_decode::<Validation>()?;
 
-        if verification.password == MatchStatus::Mismatch {
+        if validation.password == MatchStatus::Mismatch {
             error!("Wrong password");
             return Err(ClientError::PasswordNotValid);
         }
         info!("Correct password");
 
-        if verification.hash == MatchStatus::Mismatch {
+        if validation.path != PathStatus::Valid {
+            error!("Remote path is not valid: {}", validation.path);
+            return Err(validation.path.into());
+        }
+        info!("Remota path is valid");
+
+        if validation.hash == MatchStatus::Mismatch {
             info!("Uploading file because remote hash did not match");
             self.transport.send_file(&mut reader, req.size)?;
         } else {

@@ -1,5 +1,5 @@
 use crate::{
-    protocol::{Action, Request},
+    protocol::{Action, MatchStatus, PathStatus, Request},
     transport::{Transport, TransportError},
 };
 use bincode::error::{DecodeError, EncodeError};
@@ -26,7 +26,15 @@ impl ClientHandler {
         let req: Request = self.transport.read_and_decode()?;
         debug!("Received request header: {req:?}");
 
-        self.verification(&req)?;
+        let validation = self.validation(&req)?;
+
+        if validation.hash == MatchStatus::Mismatch {
+            self.upload(&req.path, req.size)?;
+            info!("File received successfully");
+        }
+
+        #[cfg(unix)]
+        self.set_permissions(&req.path)?;
 
         if req.action == Action::Upload {
             info!("Done with this client");
@@ -55,4 +63,6 @@ pub(super) enum HandlerError {
     PasswordsDontMatch,
     #[error("Version mismatch: {0}")]
     VersionMismatch(String),
+    #[error("Path validation error: {0}")]
+    PathValidation(#[from] PathStatus),
 }
