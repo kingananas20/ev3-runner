@@ -26,15 +26,15 @@ impl ClientHandler {
         let req: Request = self.transport.read_and_decode()?;
         debug!("Received request header: {req:?}");
 
-        let validation = self.validation(&req)?;
+        let (validation, safe_path) = self.validation(&req)?;
 
         if validation.hash == MatchStatus::Mismatch {
-            self.upload(&req.path, req.size)?;
+            self.upload(&safe_path, req.size)?;
             info!("File received successfully");
         }
 
         #[cfg(unix)]
-        self.set_permissions(&req.path)?;
+        self.set_permissions(&safe_path)?;
 
         if req.action == Action::Upload {
             info!("Done with this client");
@@ -42,7 +42,7 @@ impl ClientHandler {
         }
 
         if let Action::Run(brickrun) = req.action {
-            self.run(&req.path, brickrun)?;
+            self.run(&safe_path, brickrun)?;
         }
 
         Ok(())

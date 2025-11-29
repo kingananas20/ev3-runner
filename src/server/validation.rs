@@ -1,12 +1,14 @@
 use crate::protocol::{MatchStatus, PathStatus, Request, Validation};
 use crate::server::handler::{ClientHandler, HandlerError};
 use std::env;
-use std::io::Error;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use tracing::{info, warn};
 
 impl ClientHandler {
-    pub(super) fn validation(&mut self, req: &Request) -> Result<Validation, HandlerError> {
+    pub(super) fn validation(
+        &mut self,
+        req: &Request,
+    ) -> Result<(Validation, PathBuf), HandlerError> {
         let mut validation = Validation::default();
 
         if req.password != self.password {
@@ -18,45 +20,56 @@ impl ClientHandler {
             info!("Passwords matched!");
         }
 
-        validation.path = Self::validate_path(&req.path)?;
-        if validation.path != PathStatus::Valid {
-            self.transport.encode_and_write(validation)?;
-            warn!("Path is not valid: {}", validation.path);
-            return Err(validation.path.into());
-        }
+        let (safe_path, path_status) = match Self::validate_path(&req.path) {
+            Ok(sp) => {
+                info!("Path is valid");
+                (sp, PathStatus::Valid)
+            }
+            Err(e) => {
+                warn!("Path is not valid: {e}");
+                validation.path = e;
+                self.transport.encode_and_write(validation)?;
+                return Err(e.into());
+            }
+        };
+        validation.path = path_status;
 
         validation.hash = Self::check_hash(&req.path, req.hash)?;
         self.transport.encode_and_write(validation)?;
 
-        Ok(validation)
+        Ok((validation, safe_path))
     }
 
-    pub(super) fn validate_path(path: &Path) -> Result<PathStatus, Error> {
+    pub(super) fn validate_path(path: &Path) -> Result<PathBuf, PathStatus> {
         if path.is_absolute() {
-            return Ok(PathStatus::AbsolutePath);
+            return Err(PathStatus::AbsolutePath);
         }
 
         if path
             .components()
             .any(|c| matches!(c, std::path::Component::ParentDir))
         {
-            return Ok(PathStatus::InvalidComponents);
+            return Err(PathStatus::InvalidComponents);
         }
 
-        let working_dir = env::current_dir()?;
+        let working_dir = env::current_dir().map_err(|_| PathStatus::CanonicalizationFailed)?;
 
         let target_path = working_dir.join(path);
 
         let canonical_target = if target_path.exists() {
-            target_path.canonicalize()?
+            target_path
+                .canonicalize()
+                .map_err(|_| PathStatus::CanonicalizationFailed)?
         } else {
             let parent = target_path.parent().unwrap_or(&working_dir);
 
             if parent.exists() {
-                let canonical_parent = parent.canonicalize()?;
+                let canonical_parent = parent
+                    .canonicalize()
+                    .map_err(|_| PathStatus::CanonicalizationFailed)?;
                 let file_name = match target_path.file_name() {
                     Some(f) => f,
-                    None => return Ok(PathStatus::InvalidComponents),
+                    None => return Err(PathStatus::InvalidComponents),
                 };
                 canonical_parent.join(file_name)
             } else {
@@ -65,9 +78,15 @@ impl ClientHandler {
         };
 
         if !canonical_target.starts_with(&working_dir) {
-            return Ok(PathStatus::EscapesWorkingDir);
+            return Err(PathStatus::EscapesWorkingDir);
         }
 
-        Ok(PathStatus::Valid)
+        let safe_path = canonical_target
+            .strip_prefix(&working_dir)
+            .expect("Panicking is impossible")
+            .to_path_buf();
+        info!("Safe path: {}", safe_path.display());
+
+        Ok(safe_path)
     }
 }

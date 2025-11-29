@@ -68,6 +68,8 @@ pub struct ClientArgs {
 
     /// Server address and port
     #[clap(
+        short,
+        long,
         default_value = "127.0.0.1:6767",
         value_name = "HOST:PORT",
         help = "Server address in format IP:PORT"

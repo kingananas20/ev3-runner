@@ -1,13 +1,15 @@
 use crate::BUFFER_SIZE;
 use bincode::error::{DecodeError, EncodeError};
 use bincode::{Encode, config::standard, de::Decode};
+use socket2::Socket;
 use std::net::{Shutdown, TcpStream};
 use std::ops::{Deref, DerefMut};
+use std::time::Instant;
 use std::{
     cmp,
     io::{Error, Read, Write},
 };
-use tracing::{trace, warn};
+use tracing::{debug, trace, warn};
 
 #[derive(Debug, thiserror::Error)]
 pub enum TransportError {
@@ -25,12 +27,25 @@ pub struct Transport {
 
 impl Transport {
     pub fn new(stream: TcpStream) -> Self {
+        stream.set_nodelay(true).unwrap();
+        Self::set_buffers(&stream).unwrap();
         Self { stream }
     }
 
     pub fn connect(addr: &str) -> Result<Self, TransportError> {
         let stream = TcpStream::connect(addr)?;
+        stream.set_nodelay(true)?;
+        Self::set_buffers(&stream)?;
         Ok(Self { stream })
+    }
+
+    const SOCK_BUFFER_SIZE: usize = 256 * 1024;
+
+    fn set_buffers(stream: &TcpStream) -> Result<(), TransportError> {
+        let socket = Socket::from(stream.try_clone()?);
+        socket.set_send_buffer_size(Self::SOCK_BUFFER_SIZE)?;
+        socket.set_recv_buffer_size(Self::SOCK_BUFFER_SIZE)?;
+        Ok(())
     }
 
     pub fn encode_and_write<T>(&mut self, data: T) -> Result<(), TransportError>
@@ -110,25 +125,31 @@ impl Transport {
     where
         W: Write,
     {
+        let instant = Instant::now();
         let mut buf = [0u8; BUFFER_SIZE];
         let mut remaining = size as usize;
 
         while remaining > 0 {
-            let to_read = cmp::min(remaining, BUFFER_SIZE);
-
-            self.stream.read_exact(&mut buf[..to_read]).map_err(|e| {
+            let i1 = Instant::now();
+            let n = self.stream.read(&mut buf).map_err(|e| {
                 warn!("Failed to read the file from the stream: {e}");
                 e
             })?;
-
-            file.write_all(&buf[..to_read]).map_err(|e| {
+            if n == 0 {
+                break;
+            }
+            let i2 = Instant::now();
+            file.write_all(&buf[..n]).map_err(|e| {
                 warn!("Failed to write file content to disk: {e}");
                 e
             })?;
-
-            remaining -= to_read;
-            trace!("remaining: {remaining} / read: {to_read}");
+            let i3 = Instant::now();
+            remaining -= n;
+            trace!("remaining: {remaining} / read: {n}");
+            trace!("read took: {:?}, write took {:?}", i2 - i1, i3 - i2);
         }
+
+        debug!("Took {:?}", instant.elapsed());
 
         Ok(())
     }
@@ -143,6 +164,7 @@ impl Transport {
                 warn!("Failed to read output of the spawned command: {e}");
                 e
             })?;
+            trace!("n: {n}");
             if n == 0 {
                 break;
             }

@@ -12,19 +12,28 @@ impl ClientHandler {
 
         let (mut reader, writer) = io::pipe()?;
 
-        let command = if brickrun {
-            format!("brickrun ./{}", path.display())
+        let mut child = if brickrun {
+            let command = format!("brickrun -r ./{}", path.display());
+            Command::new("sh")
+                .arg("-c")
+                .arg(&command)
+                .stdout(writer.try_clone()?)
+                .stderr(writer)
+                .spawn()
+                .map_err(|e| {
+                    warn!("Failed to spawn brickrun command: {e}");
+                    e
+                })?
         } else {
-            format!("./{}", path.display())
+            Command::new(format!("./{}", path.display()))
+                .stdout(writer.try_clone()?)
+                .stderr(writer)
+                .spawn()
+                .map_err(|e| {
+                    warn!("Failed to spawn command: {e}");
+                    e
+                })?
         };
-        let mut child = Command::new(command)
-            .stdout(writer.try_clone()?)
-            .stderr(writer)
-            .spawn()
-            .map_err(|e| {
-                warn!("Failed to spawn command: {e}");
-                e
-            })?;
 
         if let Err(e) = self.transport.send_output(&mut reader) {
             warn!("Failed to send output to client: {e}");

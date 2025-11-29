@@ -22,7 +22,7 @@ impl ClientSession {
             error!("Remote path is not valid: {}", validation.path);
             return Err(validation.path.into());
         }
-        info!("Remota path is valid");
+        info!("Remote path is valid");
 
         if validation.hash == MatchStatus::Mismatch {
             info!("Uploading file because remote hash did not match");
