@@ -1,7 +1,6 @@
 use crate::BUFFER_SIZE;
 use bincode::error::{DecodeError, EncodeError};
 use bincode::{Encode, config::standard, de::Decode};
-use socket2::Socket;
 use std::net::{Shutdown, TcpStream};
 use std::ops::{Deref, DerefMut};
 use std::time::Instant;
@@ -28,24 +27,13 @@ pub struct Transport {
 impl Transport {
     pub fn new(stream: TcpStream) -> Self {
         stream.set_nodelay(true).unwrap();
-        Self::set_buffers(&stream).unwrap();
         Self { stream }
     }
 
     pub fn connect(addr: &str) -> Result<Self, TransportError> {
         let stream = TcpStream::connect(addr)?;
         stream.set_nodelay(true)?;
-        Self::set_buffers(&stream)?;
         Ok(Self { stream })
-    }
-
-    const SOCK_BUFFER_SIZE: usize = 256 * 1024;
-
-    fn set_buffers(stream: &TcpStream) -> Result<(), TransportError> {
-        let socket = Socket::from(stream.try_clone()?);
-        socket.set_send_buffer_size(Self::SOCK_BUFFER_SIZE)?;
-        socket.set_recv_buffer_size(Self::SOCK_BUFFER_SIZE)?;
-        Ok(())
     }
 
     pub fn encode_and_write<T>(&mut self, data: T) -> Result<(), TransportError>
