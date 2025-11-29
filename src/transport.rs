@@ -1,14 +1,12 @@
+mod file_transfer;
+
 use crate::BUFFER_SIZE;
 use bincode::error::{DecodeError, EncodeError};
 use bincode::{Encode, config::standard, de::Decode};
+use std::io::{Error, Read, Write};
 use std::net::{Shutdown, TcpStream};
 use std::ops::{Deref, DerefMut};
-use std::time::Instant;
-use std::{
-    cmp,
-    io::{Error, Read, Write},
-};
-use tracing::{debug, trace, warn};
+use tracing::{trace, warn};
 
 #[derive(Debug, thiserror::Error)]
 pub enum TransportError {
@@ -80,66 +78,6 @@ impl Transport {
             e
         })?;
         Ok(data)
-    }
-
-    pub fn send_file<R>(&mut self, file: &mut R, size: u64) -> Result<(), TransportError>
-    where
-        R: Read,
-    {
-        let mut buf = [0u8; BUFFER_SIZE];
-        let mut remaining = size as usize;
-
-        while remaining > 0 {
-            let to_read = cmp::min(remaining, buf.len());
-
-            file.read_exact(&mut buf[..to_read]).map_err(|e| {
-                warn!("Failed to read the file from disk: {e}");
-                e
-            })?;
-
-            self.stream.write_all(&buf[..to_read]).map_err(|e| {
-                warn!("Failed to write File to stream: {e}");
-                e
-            })?;
-
-            remaining -= to_read;
-            trace!("remaining: {remaining} / read: {to_read}");
-        }
-
-        Ok(())
-    }
-
-    pub fn receive_file<W>(&mut self, file: &mut W, size: u64) -> Result<(), TransportError>
-    where
-        W: Write,
-    {
-        let instant = Instant::now();
-        let mut buf = [0u8; BUFFER_SIZE];
-        let mut remaining = size as usize;
-
-        while remaining > 0 {
-            let i1 = Instant::now();
-            let n = self.stream.read(&mut buf).map_err(|e| {
-                warn!("Failed to read the file from the stream: {e}");
-                e
-            })?;
-            if n == 0 {
-                break;
-            }
-            let i2 = Instant::now();
-            file.write_all(&buf[..n]).map_err(|e| {
-                warn!("Failed to write file content to disk: {e}");
-                e
-            })?;
-            let i3 = Instant::now();
-            remaining -= n;
-            trace!("remaining: {remaining} / read: {n}");
-            trace!("read took: {:?}, write took {:?}", i2 - i1, i3 - i2);
-        }
-
-        debug!("Took {:?}", instant.elapsed());
-
-        Ok(())
     }
 
     pub fn send_output<R>(&mut self, output: &mut R) -> Result<(), TransportError>

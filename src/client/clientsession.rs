@@ -55,7 +55,7 @@ impl ClientSession {
         let (req, reader) = self.setup()?;
         self.transport.encode_and_write(&req)?;
 
-        self.validation(req, reader)?;
+        self.validation(reader)?;
 
         if self.action == Action::Upload {
             info!("Done with this session");
