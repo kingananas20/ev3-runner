@@ -1,13 +1,12 @@
 mod file_transfer;
 mod framed;
+mod process_stream;
 mod stream_framer;
 
-use crate::BUFFER_SIZE;
 use bincode::error::{DecodeError, EncodeError};
-use std::io::{Error, Read, Write};
+use std::io::{Error, Write};
 use std::net::{Shutdown, TcpStream};
 use std::ops::{Deref, DerefMut};
-use tracing::{trace, warn};
 
 #[derive(Debug, thiserror::Error)]
 pub enum TransportError {
@@ -34,55 +33,6 @@ impl Transport {
         stream.set_nodelay(true)?;
         Ok(Self { stream })
     }
-
-    pub fn send_output<R>(&mut self, output: &mut R) -> Result<(), TransportError>
-    where
-        R: Read,
-    {
-        let mut buf = [0u8; BUFFER_SIZE];
-        loop {
-            let n = output.read(&mut buf).map_err(|e| {
-                warn!("Failed to read output of the spawned command: {e}");
-                e
-            })?;
-            trace!("n: {n}");
-            if n == 0 {
-                break;
-            }
-            self.stream.write_all(&buf[..n]).map_err(|e| {
-                warn!("Failed to write output to the stream: {e}");
-                e
-            })?;
-        }
-
-        Ok(())
-    }
-
-    pub fn receive_output<W>(&mut self, output: &mut W) -> Result<(), TransportError>
-    where
-        W: Write,
-    {
-        let mut buf = [0u8; BUFFER_SIZE];
-        loop {
-            let n = self.stream.read(&mut buf).map_err(|e| {
-                warn!("Failed to read from the stream: {e}");
-                e
-            })?;
-            if n == 0 {
-                break;
-            }
-            output.write_all(&buf[..n]).map_err(|e| {
-                warn!("Failed to write to the output: {e}");
-                e
-            })?;
-            output.flush().map_err(|e| {
-                warn!("Failed to flush the output: {e}");
-                e
-            })?;
-        }
-
-        Ok(())
-    }
 }
 
 impl Deref for Transport {
@@ -101,11 +51,7 @@ impl DerefMut for Transport {
 
 impl Drop for Transport {
     fn drop(&mut self) {
-        if let Err(e) = self.stream.flush() {
-            warn!("Failed to flush stream during cleanup: {e}");
-        };
-        if let Err(e) = self.stream.shutdown(Shutdown::Both) {
-            warn!("Failed to shutdown stream during cleanup: {e}");
-        };
+        self.stream.flush().ok();
+        self.stream.shutdown(Shutdown::Both).ok();
     }
 }
