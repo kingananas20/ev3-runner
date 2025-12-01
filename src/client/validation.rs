@@ -22,7 +22,7 @@ impl ClientSession {
 
         if validation.hash == MatchStatus::Mismatch {
             info!("Uploading file because remote hash did not match");
-            self.transport.send_file(&mut reader)?;
+            self.transport.upload_file(&mut reader)?;
         } else {
             info!("Remote file already up to date, no upload needed");
         }

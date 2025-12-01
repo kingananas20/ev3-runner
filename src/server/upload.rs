@@ -19,7 +19,7 @@ impl ClientHandler {
                 e
             })?;
 
-        self.transport.receive_file(&mut new_file)?;
+        self.transport.download_file(&mut new_file)?;
 
         Ok(())
     }

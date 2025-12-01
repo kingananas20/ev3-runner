@@ -8,7 +8,7 @@ use tracing::debug;
 const FILE_TRANSFER_BUFFER: usize = 512 * 1024;
 
 impl Transport {
-    pub fn send_file<R>(&mut self, file: &mut R) -> Result<(), TransportError>
+    pub fn upload_file<R>(&mut self, file: &mut R) -> Result<(), TransportError>
     where
         R: Read,
     {
@@ -24,7 +24,7 @@ impl Transport {
         Ok(())
     }
 
-    pub fn receive_file<W>(&mut self, file: &mut W) -> Result<(), TransportError>
+    pub fn download_file<W>(&mut self, file: &mut W) -> Result<(), TransportError>
     where
         W: Write,
     {

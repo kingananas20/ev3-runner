@@ -35,7 +35,7 @@ impl ClientHandler {
                 })?
         };
 
-        if let Err(e) = self.transport.send_output(&mut reader) {
+        if let Err(e) = self.transport.forward_output(&mut reader) {
             warn!("Failed to send output to client: {e}");
             child.kill()?;
             return Err(e.into());

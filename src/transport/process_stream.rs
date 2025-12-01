@@ -4,7 +4,7 @@ use std::io::{Read, Write};
 use tracing::{debug, warn};
 
 impl Transport {
-    pub fn send_output<R>(&mut self, output: &mut R) -> Result<(), TransportError>
+    pub fn forward_output<R>(&mut self, output: &mut R) -> Result<(), TransportError>
     where
         R: Read,
     {
