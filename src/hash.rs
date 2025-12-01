@@ -10,7 +10,7 @@ use twox_hash::XxHash64;
 pub struct Hasher;
 
 impl Hasher {
-    const SEED: u64 = 4167;
+    const SEED: u64 = 4167; // Just a random number
 
     pub fn hash_file(file: &mut BufReader<File>) -> Result<u64, Error> {
         let mut hasher = XxHash64::with_seed(Self::SEED);

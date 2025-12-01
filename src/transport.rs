@@ -101,7 +101,11 @@ impl DerefMut for Transport {
 
 impl Drop for Transport {
     fn drop(&mut self) {
-        self.stream.flush().ok();
-        self.stream.shutdown(Shutdown::Both).ok();
+        if let Err(e) = self.stream.flush() {
+            warn!("Failed to flush stream during cleanup: {e}");
+        };
+        if let Err(e) = self.stream.shutdown(Shutdown::Both) {
+            warn!("Failed to shutdown stream during cleanup: {e}");
+        };
     }
 }

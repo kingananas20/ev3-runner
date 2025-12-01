@@ -50,7 +50,7 @@ impl ClientHandler {
 }
 
 #[derive(Debug, thiserror::Error)]
-pub(super) enum HandlerError {
+pub enum HandlerError {
     #[error("Error in the transport layer: {0}")]
     Transport(#[from] TransportError),
     #[error("Encode error: {0}")]

@@ -1,5 +1,8 @@
 use std::io::{self, Read, Write};
 
+const CHUNK_SIZE: usize = 8 * 1024;
+const FRAME_LENGTH_SIZE: usize = 4;
+
 /// Stream framing protocol for continuous streaming
 pub struct StreamFramer;
 
@@ -18,7 +21,7 @@ impl StreamFramer {
         ChunkedWriter {
             inner: writer,
             buffer: Vec::new(),
-            chunk_size: 8 * 1024,
+            chunk_size: CHUNK_SIZE,
         }
     }
 }
@@ -43,7 +46,7 @@ impl<R: Read> Read for ChunkedReader<R> {
             return Ok(to_copy);
         }
 
-        let mut len_buf = [0u8; 4];
+        let mut len_buf = [0u8; FRAME_LENGTH_SIZE];
         self.inner.read_exact(&mut len_buf)?;
         let chunk_len = u32::from_le_bytes(len_buf) as usize;
 

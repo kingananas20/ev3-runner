@@ -12,11 +12,11 @@ impl ClientHandler {
 
         let (mut reader, writer) = io::pipe()?;
 
+        let arg = format!("./{}", path.display());
         let mut child = if brickrun {
-            let command = format!("brickrun -r ./{}", path.display());
-            Command::new("sh")
-                .arg("-c")
-                .arg(&command)
+            Command::new("brickrun")
+                .arg("-r")
+                .arg(arg)
                 .stdout(writer.try_clone()?)
                 .stderr(writer)
                 .spawn()
@@ -25,7 +25,7 @@ impl ClientHandler {
                     e
                 })?
         } else {
-            Command::new(format!("./{}", path.display()))
+            Command::new(arg)
                 .stdout(writer.try_clone()?)
                 .stderr(writer)
                 .spawn()

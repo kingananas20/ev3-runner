@@ -5,6 +5,8 @@ use std::{
 };
 use tracing::debug;
 
+const FILE_TRANSFER_BUFFER: usize = 512 * 1024;
+
 impl Transport {
     pub fn send_file<R>(&mut self, file: &mut R) -> Result<(), TransportError>
     where
@@ -12,7 +14,7 @@ impl Transport {
     {
         let instant = Instant::now();
 
-        let writer = BufWriter::with_capacity(512 * 1024, &mut self.stream);
+        let writer = BufWriter::with_capacity(FILE_TRANSFER_BUFFER, &mut self.stream);
         let mut chunked = StreamFramer::streaming_writer(writer);
         let bytes = io::copy(file, &mut chunked)?;
         chunked.flush()?;
@@ -28,7 +30,7 @@ impl Transport {
     {
         let instant = Instant::now();
 
-        let reader = BufReader::with_capacity(512 * 1024, &mut self.stream);
+        let reader = BufReader::with_capacity(FILE_TRANSFER_BUFFER, &mut self.stream);
         let mut chunked = StreamFramer::streaming_reader(reader);
         let bytes = io::copy(&mut chunked, file)?;
         file.flush()?;
