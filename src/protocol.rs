@@ -17,7 +17,6 @@ pub enum VersionStatus {
 pub struct Request {
     pub action: Action,
     pub path: PathBuf,
-    pub size: u64,
     pub hash: u64,
     pub password: [u8; 32],
 }
@@ -27,7 +26,6 @@ impl Debug for Request {
         f.debug_struct("Request")
             .field("action", &self.action)
             .field("path", &self.path)
-            .field("size", &self.size)
             .field("hash", &self.hash)
             .field("password", &"REDACTED")
             .finish()

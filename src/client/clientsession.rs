@@ -87,7 +87,6 @@ impl ClientSession {
         )?;
 
         let file = File::open(&self.args.filepath)?;
-        let file_size = file.metadata()?.len();
         let mut reader = BufReader::new(file);
 
         let hash = Hasher::hash_file(&mut reader)?;
@@ -97,7 +96,6 @@ impl ClientSession {
         let request = Request {
             action: self.action,
             path: remote_path,
-            size: file_size,
             hash,
             password: password_hash,
         };
