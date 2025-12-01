@@ -4,6 +4,7 @@ use std::{
     time::Instant,
 };
 use tracing::debug;
+use zstd::{Decoder, Encoder};
 
 const FILE_TRANSFER_BUFFER: usize = 512 * 1024;
 
@@ -15,8 +16,11 @@ impl Transport {
         let instant = Instant::now();
 
         let writer = BufWriter::with_capacity(FILE_TRANSFER_BUFFER, &mut self.stream);
-        let mut chunked = StreamFramer::streaming_writer(writer);
-        let bytes = io::copy(file, &mut chunked)?;
+        let chunked = StreamFramer::streaming_writer(writer);
+        let mut encoder = Encoder::new(chunked, 3)?;
+        let bytes = io::copy(file, &mut encoder)?;
+        encoder.flush()?;
+        let mut chunked = encoder.finish()?;
         chunked.flush()?;
 
         debug!("Sending file: {bytes} bytes, took {:?}", instant.elapsed());
@@ -31,8 +35,9 @@ impl Transport {
         let instant = Instant::now();
 
         let reader = BufReader::with_capacity(FILE_TRANSFER_BUFFER, &mut self.stream);
-        let mut chunked = StreamFramer::streaming_reader(reader);
-        let bytes = io::copy(&mut chunked, file)?;
+        let chunked = StreamFramer::streaming_reader(reader);
+        let mut decoder = Decoder::new(chunked)?;
+        let bytes = io::copy(&mut decoder, file)?;
         file.flush()?;
 
         debug!(
