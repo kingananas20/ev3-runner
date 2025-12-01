@@ -3,12 +3,13 @@ use std::{fs::OpenOptions, path::Path};
 use tracing::{debug, warn};
 
 impl ClientHandler {
-    pub(super) fn upload(&mut self, path: &Path, size: u64) -> Result<(), HandlerError> {
-        debug!("Downloading file to {path:?} with the size of {size} bytes");
+    pub(super) fn upload(&mut self, path: &Path) -> Result<(), HandlerError> {
+        debug!("Downloading file to {path:?}");
 
-        let mut file = OpenOptions::new()
+        let mut new_file = OpenOptions::new()
             .create(true)
             .write(true)
+            .read(true)
             .truncate(true)
             .open(path)
             .map_err(|e| {
@@ -18,7 +19,7 @@ impl ClientHandler {
                 e
             })?;
 
-        self.transport.receive_file(&mut file, size)?;
+        self.transport.receive_file(&mut new_file)?;
 
         Ok(())
     }

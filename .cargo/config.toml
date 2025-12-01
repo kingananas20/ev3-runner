@@ -1,2 +1,7 @@
 [target.armv5te-unknown-linux-musleabi]
-linker = "rust-lld"
+linker = "arm-linux-musleabi-gcc"
+
+[env]
+CC_armv5te_unknown_linux_musleabi = "arm-linux-musleabi-gcc"
+AR_armv5te_unknown_linux_musleabi = "arm-linux-musleabi-ar"
+FLAGS_armv5te_unknown_linux_musleabi = "-I/opt/muslcc/arm-linux-musleabi-cross/arm-linux-musleabi/include"

@@ -1,4 +1,4 @@
-use super::{Transport, TransportError};
+use super::{Transport, TransportError, stream_framer::StreamFramer};
 use std::{
     io::{self, BufReader, BufWriter, Read, Write},
     time::Instant,
@@ -12,24 +12,25 @@ impl Transport {
     {
         let instant = Instant::now();
 
-        let mut writer = BufWriter::with_capacity(512 * 1024, &mut self.stream);
-        let bytes = io::copy(file, &mut writer)?;
-        writer.flush()?;
+        let writer = BufWriter::with_capacity(512 * 1024, &mut self.stream);
+        let mut chunked = StreamFramer::streaming_writer(writer);
+        let bytes = io::copy(file, &mut chunked)?;
+        chunked.flush()?;
 
         debug!("Sending file: {bytes} bytes, took {:?}", instant.elapsed());
 
         Ok(())
     }
 
-    pub fn receive_file<W>(&mut self, file: &mut W, size: u64) -> Result<(), TransportError>
+    pub fn receive_file<W>(&mut self, file: &mut W) -> Result<(), TransportError>
     where
         W: Write,
     {
         let instant = Instant::now();
 
         let reader = BufReader::with_capacity(512 * 1024, &mut self.stream);
-        let mut limited = reader.take(size);
-        let bytes = io::copy(&mut limited, file)?;
+        let mut chunked = StreamFramer::streaming_reader(reader);
+        let bytes = io::copy(&mut chunked, file)?;
         file.flush()?;
 
         debug!(
