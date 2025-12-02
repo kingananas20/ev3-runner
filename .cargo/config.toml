@@ -1,2 +1,2 @@
 [target.armv5te-unknown-linux-musleabi]
-linker = "rust-lld"
+linker = "arm-linux-musleabi-gcc"
