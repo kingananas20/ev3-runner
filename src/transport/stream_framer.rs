@@ -1,6 +1,6 @@
 use std::io::{self, Read, Write};
 
-const CHUNK_SIZE: usize = 8 * 1024;
+const CHUNK_SIZE: usize = 32 * 1024;
 const FRAME_LENGTH_SIZE: usize = 4;
 
 /// Stream framing protocol for continuous streaming

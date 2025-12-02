@@ -1,7 +1,7 @@
+mod download;
 mod handler;
 mod hash;
 mod run;
-mod upload;
 mod validation;
 mod version;
 

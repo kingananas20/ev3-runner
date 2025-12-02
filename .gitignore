@@ -1,3 +1,5 @@
 /target
 /sftp-data
 docker-compose.yml
+/test.sh
+/ev3*

@@ -18,6 +18,7 @@ pub struct Request {
     pub action: Action,
     pub path: PathBuf,
     pub hash: u64,
+    pub use_compression: bool,
     pub password: [u8; 32],
 }
 

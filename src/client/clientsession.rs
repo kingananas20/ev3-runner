@@ -97,6 +97,7 @@ impl ClientSession {
             action: self.action,
             path: remote_path,
             hash,
+            use_compression: self.args.compression,
             password: password_hash,
         };
 

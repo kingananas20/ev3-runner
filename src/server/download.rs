@@ -1,12 +1,19 @@
-use crate::server::handler::{ClientHandler, HandlerError};
-use std::{fs::OpenOptions, path::Path};
+use crate::{
+    server::handler::{ClientHandler, HandlerError},
+    transport::Transport,
+};
+use std::{fs::OpenOptions, io::BufWriter, path::Path};
 use tracing::{debug, warn};
 
 impl ClientHandler {
-    pub(super) fn upload(&mut self, path: &Path) -> Result<(), HandlerError> {
-        debug!("Downloading file to {path:?}");
+    pub(super) fn download(
+        &mut self,
+        path: &Path,
+        use_compression: bool,
+    ) -> Result<(), HandlerError> {
+        debug!("Downloading file to {:?}", path.display());
 
-        let mut new_file = OpenOptions::new()
+        let file = OpenOptions::new()
             .create(true)
             .write(true)
             .read(true)
@@ -19,7 +26,9 @@ impl ClientHandler {
                 e
             })?;
 
-        self.transport.download_file(&mut new_file)?;
+        let mut writer = BufWriter::with_capacity(Transport::FILE_TRANSFER_BUFFER, file);
+
+        self.transport.download_file(&mut writer, use_compression)?;
 
         Ok(())
     }

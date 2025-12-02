@@ -68,7 +68,6 @@ pub struct ClientArgs {
 
     /// Server address and port
     #[clap(
-        short,
         long,
         default_value = "127.0.0.1:6767",
         value_name = "HOST:PORT",
@@ -96,15 +95,19 @@ pub struct ClientArgs {
     pub password: String,
 
     /// Use brickrun
-    #[clap(short, long, action = clap::ArgAction::SetFalse, help = "If the program should be started using brickrun")]
+    #[clap(short, long, help = "If the program should be started using brickrun")]
     pub brickrun: bool,
+
+    /// If compression should be used to send the file
+    #[clap(short, long, help = "If compression should be used to send the file")]
+    pub compression: bool,
 }
 
 #[derive(Debug, clap::Args)]
 pub struct Server {
     /// Port to listen on
     #[clap(
-        short = 'p',
+        short,
         long,
         default_value = "6767",
         value_name = "PORT",

@@ -29,7 +29,7 @@ impl ClientHandler {
         let (validation, safe_path) = self.validation(&req)?;
 
         if validation.hash == MatchStatus::Mismatch {
-            self.upload(&safe_path)?;
+            self.download(&safe_path, req.use_compression)?;
             info!("File received successfully");
         }
 

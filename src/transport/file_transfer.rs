@@ -6,38 +6,61 @@ use std::{
 use tracing::debug;
 use zstd::{Decoder, Encoder};
 
-const FILE_TRANSFER_BUFFER: usize = 512 * 1024;
-
 impl Transport {
-    pub fn upload_file<R>(&mut self, file: &mut R) -> Result<(), TransportError>
+    pub const FILE_TRANSFER_BUFFER: usize = 512 * 1024;
+    const ENCODER_LEVEL: i32 = 1;
+
+    pub fn upload_file<R>(
+        &mut self,
+        file: &mut R,
+        use_compression: bool,
+    ) -> Result<(), TransportError>
     where
         R: Read,
     {
         let instant = Instant::now();
 
-        let writer = BufWriter::with_capacity(FILE_TRANSFER_BUFFER, &mut self.stream);
-        let chunked = StreamFramer::streaming_writer(writer);
-        let mut encoder = Encoder::new(chunked, 3)?;
-        let bytes = io::copy(file, &mut encoder)?;
-        encoder.flush()?;
-        let mut chunked = encoder.finish()?;
-        chunked.flush()?;
+        let mut buf_writer = BufWriter::with_capacity(Self::FILE_TRANSFER_BUFFER, &mut self.stream);
+        let mut writer = StreamFramer::streaming_writer(&mut buf_writer);
+
+        let bytes = if use_compression {
+            let mut enocder = Encoder::new(&mut writer, Self::ENCODER_LEVEL)?;
+            let bytes = io::copy(file, &mut enocder);
+            enocder.flush()?;
+            bytes
+        } else {
+            io::copy(file, &mut writer)
+        }?;
+        writer.flush()?;
+        drop(writer);
+        buf_writer.flush()?;
 
         debug!("Sending file: {bytes} bytes, took {:?}", instant.elapsed());
 
         Ok(())
     }
 
-    pub fn download_file<W>(&mut self, file: &mut W) -> Result<(), TransportError>
+    pub fn download_file<W>(
+        &mut self,
+        file: &mut W,
+        use_compression: bool,
+    ) -> Result<(), TransportError>
     where
         W: Write,
     {
         let instant = Instant::now();
 
-        let reader = BufReader::with_capacity(FILE_TRANSFER_BUFFER, &mut self.stream);
-        let chunked = StreamFramer::streaming_reader(reader);
-        let mut decoder = Decoder::new(chunked)?;
-        let bytes = io::copy(&mut decoder, file)?;
+        let mut reader = StreamFramer::streaming_reader(BufReader::with_capacity(
+            Self::FILE_TRANSFER_BUFFER,
+            &mut self.stream,
+        ));
+
+        let bytes = if use_compression {
+            let mut decoder = Decoder::new(&mut reader)?;
+            io::copy(&mut decoder, file)
+        } else {
+            io::copy(&mut reader, file)
+        }?;
         file.flush()?;
 
         debug!(
