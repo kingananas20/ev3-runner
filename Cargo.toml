@@ -1,6 +1,6 @@
 [package]
 name = "ev3-runner"
-version = "1.3.1"
+version = "1.3.2"
 edition = "2024"
 license = "MIT"
 description = "A command-line tool to upload and run binaries on LEGO EV3 robots running ev3dev over TCP."
