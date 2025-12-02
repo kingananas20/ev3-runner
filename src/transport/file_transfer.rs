@@ -3,12 +3,12 @@ use std::{
     io::{self, BufReader, BufWriter, Read, Write},
     time::Instant,
 };
-use tracing::debug;
+use tracing::{debug, warn};
 use zstd::{Decoder, Encoder};
 
 impl Transport {
     pub const FILE_TRANSFER_BUFFER: usize = 512 * 1024;
-    const ENCODER_LEVEL: i32 = 1;
+    const ENCODER_LEVEL: i32 = 3;
 
     pub fn upload_file<R>(
         &mut self,
@@ -24,16 +24,25 @@ impl Transport {
         let mut writer = StreamFramer::streaming_writer(&mut buf_writer);
 
         let bytes = if use_compression {
-            let mut enocder = Encoder::new(&mut writer, Self::ENCODER_LEVEL)?;
+            let mut enocder = Encoder::new(&mut writer, Self::ENCODER_LEVEL)
+                .inspect_err(|e| warn!("Failed to create new zstd encoder: {e}"))?;
             let bytes = io::copy(file, &mut enocder);
-            enocder.flush()?;
+            enocder
+                .finish()
+                .inspect_err(|e| warn!("Failed to finish the zstd encoder: {e}"))?;
             bytes
         } else {
             io::copy(file, &mut writer)
-        }?;
-        writer.flush()?;
+        }
+        .inspect_err(|e| warn!("Failed to copy data between the file and the tcp stream: {e}"))?;
+
+        writer
+            .flush()
+            .inspect_err(|e| warn!("Failed to flush chunkedwriter: {e}"))?;
         drop(writer);
-        buf_writer.flush()?;
+        buf_writer
+            .flush()
+            .inspect_err(|e| warn!("Failed to flush bufwriter: {e}"))?;
 
         debug!("Sending file: {bytes} bytes, took {:?}", instant.elapsed());
 
@@ -56,12 +65,15 @@ impl Transport {
         ));
 
         let bytes = if use_compression {
-            let mut decoder = Decoder::new(&mut reader)?;
+            let mut decoder = Decoder::new(&mut reader)
+                .inspect_err(|e| warn!("Failed to create new zstd decoder: {e}"))?;
             io::copy(&mut decoder, file)
         } else {
             io::copy(&mut reader, file)
-        }?;
-        file.flush()?;
+        }
+        .inspect_err(|e| warn!("Failed to copy data between the tcp stream and file: {e}"))?;
+        file.flush()
+            .inspect_err(|e| warn!("Failed to flush the file: {e}"))?;
 
         debug!(
             "Receiving file: {bytes} bytes, took {:?}",

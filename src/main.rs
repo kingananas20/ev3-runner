@@ -10,10 +10,8 @@ fn main() -> anyhow::Result<()> {
 
     match cli.command {
         Commands::Server(config) => server(config)?,
-        Commands::Client(config) => client(config).map_err(|e| {
-            error!("Error while handling connection with the server: {e}");
-            e
-        })?,
+        Commands::Client(config) => client(config)
+            .inspect_err(|e| error!("Error while handling connection with the server: {e}"))?,
     }
 
     Ok(())

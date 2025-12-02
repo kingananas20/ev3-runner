@@ -1,7 +1,7 @@
 use crate::VERSION;
 use crate::client::clientsession::{ClientError, ClientSession};
 use crate::protocol::{VersionHeader, VersionResponse, VersionStatus};
-use tracing::{error, info};
+use tracing::{debug, error};
 
 impl ClientSession {
     pub(super) fn check_version(&mut self) -> Result<(), ClientError> {
@@ -14,7 +14,7 @@ impl ClientSession {
             return Err(ClientError::VersionMismatch(server_version));
         };
 
-        info!("No version mismatch");
+        debug!("No version mismatch");
 
         Ok(())
     }

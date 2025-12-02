@@ -19,11 +19,10 @@ impl ClientHandler {
             .read(true)
             .truncate(true)
             .open(path)
-            .map_err(|e| {
+            .inspect_err(|e| {
                 warn!(
                     "Failed to open file with create, write and truncate options set to true: {e}"
-                );
-                e
+                )
             })?;
 
         let mut writer = BufWriter::with_capacity(Transport::FILE_TRANSFER_BUFFER, file);

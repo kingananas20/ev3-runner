@@ -5,7 +5,7 @@ use std::{
     io::{self, BufReader},
     path::Path,
 };
-use tracing::{debug, info, warn};
+use tracing::{debug, trace, warn};
 
 impl ClientHandler {
     pub(super) fn check_hash(path: &Path, remote_hash: u64) -> Result<MatchStatus, io::Error> {
@@ -13,24 +13,19 @@ impl ClientHandler {
             return Ok(MatchStatus::Mismatch);
         }
 
-        let file = File::open(path).map_err(|e| {
-            warn!("Failed to open the file: {e}");
-            e
-        })?;
+        let file = File::open(path).inspect_err(|e| warn!("Failed to open the file: {e}"))?;
         let mut reader = BufReader::new(file);
 
-        let hash = Hasher::hash_file(&mut reader).map_err(|e| {
-            warn!("Failed to calculate hash of the file: {e}");
-            e
-        })?;
+        let hash = Hasher::hash_file(&mut reader)
+            .inspect_err(|e| warn!("Failed to calculate hash of the file: {e}"))?;
 
-        debug!("hash: {hash} / remote_hash: {remote_hash}");
+        trace!("hash: {hash} / remote_hash: {remote_hash}");
         if hash != remote_hash {
-            info!("Hashes don't match");
+            debug!("Hashes don't match");
             return Ok(MatchStatus::Mismatch);
         }
 
-        info!("Hashes match");
+        debug!("Hashes match");
         Ok(MatchStatus::Match)
     }
 }

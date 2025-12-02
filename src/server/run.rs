@@ -20,19 +20,13 @@ impl ClientHandler {
                 .stdout(writer.try_clone()?)
                 .stderr(writer)
                 .spawn()
-                .map_err(|e| {
-                    warn!("Failed to spawn brickrun command: {e}");
-                    e
-                })?
+                .inspect_err(|e| warn!("Failed to spawn brickrun command: {e}"))?
         } else {
             Command::new(arg)
                 .stdout(writer.try_clone()?)
                 .stderr(writer)
                 .spawn()
-                .map_err(|e| {
-                    warn!("Failed to spawn command: {e}");
-                    e
-                })?
+                .inspect_err(|e| warn!("Failed to spawn command: {e}"))?
         };
 
         if let Err(e) = self.transport.forward_output(&mut reader) {
@@ -41,10 +35,9 @@ impl ClientHandler {
             return Err(e.into());
         }
 
-        let status = child.wait().map_err(|e| {
-            warn!("Failed to wait for exit status of the child: {e}");
-            e
-        })?;
+        let status = child
+            .wait()
+            .inspect_err(|e| warn!("Failed to wait for exit status of the child: {e}"))?;
 
         if status.success() {
             info!("Child exited with exit status: {status}");

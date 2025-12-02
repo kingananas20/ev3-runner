@@ -8,21 +8,17 @@ impl Transport {
     where
         T: Encode,
     {
-        let encoded = bincode::encode_to_vec(data, standard()).map_err(|e| {
-            warn!("Failed to encode the data: {e}");
-            e
-        })?;
+        let encoded = bincode::encode_to_vec(data, standard())
+            .inspect_err(|e| warn!("Failed to encode the data: {e}"))?;
         let len = encoded.len();
         let size = (len as u32).to_be_bytes();
 
-        self.stream.write_all(&size).map_err(|e| {
-            warn!("Failed to write the data length to the stream: {e}");
-            e
-        })?;
-        self.stream.write_all(&encoded).map_err(|e| {
-            warn!("Failed to write the data to the stream: {e}");
-            e
-        })?;
+        self.stream
+            .write_all(&size)
+            .inspect_err(|e| warn!("Failed to write the data length to the stream: {e}"))?;
+        self.stream
+            .write_all(&encoded)
+            .inspect_err(|e| warn!("Failed to write the data to the stream: {e}"))?;
         Ok(())
     }
 
@@ -31,22 +27,18 @@ impl Transport {
         T: Decode<()>,
     {
         let mut len = [0u8; 4];
-        self.stream.read_exact(&mut len).map_err(|e| {
-            warn!("Failed to read the data length from the socket: {e}");
-            e
-        })?;
+        self.stream
+            .read_exact(&mut len)
+            .inspect_err(|e| warn!("Failed to read the data length from the socket: {e}"))?;
         let size = u32::from_be_bytes(len) as usize;
 
         let mut buf = vec![0u8; size];
-        self.stream.read_exact(&mut buf).map_err(|e| {
-            warn!("Failed to read the data from the stream: {e}");
-            e
-        })?;
+        self.stream
+            .read_exact(&mut buf)
+            .inspect_err(|e| warn!("Failed to read the data from the stream: {e}"))?;
 
-        let (data, _) = bincode::decode_from_slice(&buf, standard()).map_err(|e| {
-            warn!("Failed to decode the data: {e}");
-            e
-        })?;
+        let (data, _) = bincode::decode_from_slice(&buf, standard())
+            .inspect_err(|e| warn!("Failed to decode the data: {e}"))?;
         Ok(data)
     }
 }

@@ -1,8 +1,7 @@
-use tracing::{info, warn};
-
 use crate::VERSION;
 use crate::protocol::{VersionHeader, VersionResponse, VersionStatus};
 use crate::server::handler::{ClientHandler, HandlerError};
+use tracing::{debug, warn};
 
 impl ClientHandler {
     pub(super) fn check_version(&mut self) -> Result<(), HandlerError> {
@@ -19,7 +18,7 @@ impl ClientHandler {
             return Err(HandlerError::VersionMismatch(VERSION.to_owned()));
         } else {
             self.transport.encode_and_write(version_response)?;
-            info!("No version mismatch");
+            debug!("No version mismatch");
         };
 
         Ok(())

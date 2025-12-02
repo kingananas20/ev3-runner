@@ -12,20 +12,18 @@ impl Transport {
         let mut buf = [0u8; BUFFER_SIZE];
 
         loop {
-            let n = output.read(&mut buf).map_err(|e| {
-                warn!("Failed to read output of the spawned command: {e}");
-                e
-            })?;
+            let n = output
+                .read(&mut buf)
+                .inspect_err(|e| warn!("Failed to read output of the spawned command: {e}"))?;
 
             if n == 0 {
                 break;
             }
             bytes += n;
 
-            self.stream.write_all(&buf[..n]).map_err(|e| {
-                warn!("Failed to write output to the stream: {e}");
-                e
-            })?;
+            self.stream
+                .write_all(&buf[..n])
+                .inspect_err(|e| warn!("Failed to write output to the stream: {e}"))?;
         }
 
         debug!("Streamed output to stream: {bytes} bytes");
@@ -41,24 +39,22 @@ impl Transport {
         let mut buf = [0u8; BUFFER_SIZE];
 
         loop {
-            let n = self.stream.read(&mut buf).map_err(|e| {
-                warn!("Failed to read from the stream: {e}");
-                e
-            })?;
+            let n = self
+                .stream
+                .read(&mut buf)
+                .inspect_err(|e| warn!("Failed to read from the stream: {e}"))?;
 
             if n == 0 {
                 break;
             }
             bytes += n;
 
-            output.write_all(&buf[..n]).map_err(|e| {
-                warn!("Failed to write to the output: {e}");
-                e
-            })?;
-            output.flush().map_err(|e| {
-                warn!("Failed to flush the output: {e}");
-                e
-            })?;
+            output
+                .write_all(&buf[..n])
+                .inspect_err(|e| warn!("Failed to write to the output: {e}"))?;
+            output
+                .flush()
+                .inspect_err(|e| warn!("Failed to flush the output: {e}"))?;
         }
 
         debug!("Streamed stream to output: {bytes} bytes");

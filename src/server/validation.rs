@@ -3,7 +3,7 @@ mod validate_path;
 use super::{ClientHandler, handler::HandlerError};
 use crate::protocol::{MatchStatus, PathStatus, Request, Validation};
 use std::path::PathBuf;
-use tracing::{info, warn};
+use tracing::{debug, warn};
 use validate_path::validate_path;
 
 impl ClientHandler {
@@ -15,16 +15,16 @@ impl ClientHandler {
 
         if req.password != self.password {
             self.transport.encode_and_write(validation)?;
-            info!("Passwords did not match!");
+            debug!("Passwords did not match!");
             return Err(HandlerError::PasswordsDontMatch);
         } else {
             validation.password = MatchStatus::Match;
-            info!("Passwords matched!");
+            debug!("Passwords matched!");
         }
 
         let (safe_path, path_status) = match validate_path(&req.path) {
             Ok(sp) => {
-                info!("Path is valid");
+                debug!("Path is valid");
                 (sp, PathStatus::Valid)
             }
             Err(e) => {
